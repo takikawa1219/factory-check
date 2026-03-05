@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FactoryCheck">
+  <meta name="theme-color" content="#0f172a">
+  <title>FactoryCheck - 設備・治具 点検管理</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { margin: 0; padding: 0; background: #f0f4f8; }
+    input, select, textarea, button { font-family: inherit; }
+    /* スムーズスクロール */
+    html { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React + Babel (standalone) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+
+  <script type="text/babel">
+const { useState, useRef, useEffect } = React;
+
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 定数・ユーティリティ
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const FREQUENCY_OPTIONS = [
+  { value: "daily",      label: "毎日",      days: 1   },
+  { value: "weekly",     label: "1回/週",    days: 7   },
+  { value: "biweekly",   label: "隔週",      days: 14  },
+  { value: "monthly",    label: "1回/月",    days: 30  },
+  { value: "bimonthly",  label: "隔月",      days: 60  },
+  { value: "quarterly",  label: "1回/3ヶ月", days: 90  },
+  { value: "semiannual", label: "半年",      days: 182 },
+  { value: "annual",     label: "1回/年",    days: 365 },
+  { value: "none",       label: "設定なし",  days: null},
+];
+
+const STATUS_CONFIG = {
+  正常:  { color: "#16a34a", bg: "#dcfce7", icon: "✓" },
+  要注意:{ color: "#d97706", bg: "#fef3c7", icon: "⚠" },
+  異常:  { color: "#dc2626", bg: "#fee2e2", icon: "✕" },
+  未点検:{ color: "#94a3b8", bg: "#f1f5f9", icon: "—" },
+};
+
+const CAT_COLORS = {
+  設備: { bg: "#dbeafe", color: "#1d4ed8" },
+  治具: { bg: "#fce7f3", color: "#be185d" },
+};
+
+function catStyle(cat) { return CAT_COLORS[cat] || { bg: "#e0e7ff", color: "#4338ca" }; }
+function freqLabel(v)  { return FREQUENCY_OPTIONS.find(f => f.value === v)?.label || "設定なし"; }
+function freqDays(v)   { return FREQUENCY_OPTIONS.find(f => f.value === v)?.days || null; }
+
+function fmtDate(date) {
+  if (!date) return null;
+  const y = date.getFullYear(), m = String(date.getMonth()+1).padStart(2,"0"), d = String(date.getDate()).padStart(2,"0");
+  return `${y}-${m}-${d}`;
+}
+function todayStr() { return fmtDate(new Date()); }
+function nowStr()   { return new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}); }
+function parseDate(s) { if(!s)return null; const[y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
+function calcNextDate(lastDate, freq) {
+  const days = freqDays(freq); if (!days || !lastDate) return null;
+  const d = parseDate(lastDate); d.setDate(d.getDate()+days); return fmtDate(d);
+}
+function diffFromToday(dateStr) {
+  if (!dateStr) return null;
+  const t = parseDate(dateStr), today = new Date(); today.setHours(0,0,0,0);
+  return Math.round((t - today) / 86400000);
+}
+function deadlineStatus(nextDate) {
+  if (!nextDate) return "none";
+  const diff = diffFromToday(nextDate);
+  return diff < 0 ? "overdue" : diff <= 3 ? "soon" : "ok";
+}
+const DS = {
+  overdue:{ color:"#dc2626", bg:"#fee2e2", border:"#fca5a5", icon:"⚠", label:"期限超過" },
+  soon:   { color:"#d97706", bg:"#fef3c7", border:"#fcd34d", icon:"⏰", label:"期限間近" },
+  ok:     { color:"#16a34a", bg:"#dcfce7", border:"#86efac", icon:"✓",  label:"正常"   },
+  none:   { color:"#94a3b8", bg:"#f1f5f9", border:"#e2e8f0", icon:"—",  label:"未設定" },
+};
+function equipDS(eq) {
+  const s = (eq.checkItems||[]).map(ci => deadlineStatus(calcNextDate(ci.lastDate, ci.frequency)));
+  if (s.includes("overdue")) return "overdue";
+  if (s.includes("soon"))    return "soon";
+  if (s.every(x => x==="none")) return "none";
+  return "ok";
+}
+function generateId() { return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 初期データ
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const INIT_EQUIPMENT = [
+  { id:"eq1", name:"プレス機 #1", category:"設備", location:"A棟-1F", image:null, checkItems:[
+    {id:"ci1a",label:"外観に異常（傷・変形・腐食）はないか",frequency:"daily",   lastDate:null},
+    {id:"ci1b",label:"稼働音に異常はないか",                frequency:"daily",   lastDate:null},
+    {id:"ci1c",label:"振動・発熱に異常はないか",            frequency:"weekly",  lastDate:null},
+    {id:"ci1d",label:"安全カバー・ガードは正常か",          frequency:"monthly", lastDate:null},
+    {id:"ci1e",label:"緊急停止ボタンは動作するか",          frequency:"monthly", lastDate:null},
+  ]},
+  { id:"eq2", name:"旋盤 #3", category:"設備", location:"A棟-2F", image:null, checkItems:[
+    {id:"ci2a",label:"外観に異常はないか",                  frequency:"daily",   lastDate:null},
+    {id:"ci2b",label:"オイル・冷却水の漏れはないか",        frequency:"weekly",  lastDate:null},
+    {id:"ci2c",label:"各部ボルト・ナットの緩みはないか",    frequency:"monthly", lastDate:null},
+    {id:"ci2d",label:"刃物・工具の取付は正常か",            frequency:"daily",   lastDate:null},
+  ]},
+  { id:"eq3", name:"溶接機 #2", category:"設備", location:"B棟-1F", image:null, checkItems:[
+    {id:"ci3a",label:"電源ケーブルに損傷はないか",          frequency:"weekly",  lastDate:null},
+    {id:"ci3b",label:"ガスホースの接続は正常か",            frequency:"daily",   lastDate:null},
+    {id:"ci3c",label:"アース接続は確実か",                  frequency:"weekly",  lastDate:null},
+    {id:"ci3d",label:"溶接面・保護具は揃っているか",        frequency:"monthly", lastDate:null},
+  ]},
+  { id:"eq4", name:"治具 A-07", category:"治具", location:"A棟-1F", image:null, checkItems:[
+    {id:"ci4a",label:"外観に損傷（欠け・割れ・変形）はないか",frequency:"weekly",   lastDate:null},
+    {id:"ci4b",label:"寸法精度は規格内か",                    frequency:"monthly",  lastDate:null},
+    {id:"ci4c",label:"取付穴・ピンに摩耗はないか",            frequency:"quarterly",lastDate:null},
+    {id:"ci4d",label:"刻印・識別番号は確認できるか",          frequency:"monthly",  lastDate:null},
+  ]},
+  { id:"eq5", name:"治具 B-12", category:"治具", location:"B棟-2F", image:null, checkItems:[
+    {id:"ci5a",label:"外観に損傷はないか",                  frequency:"weekly",  lastDate:null},
+    {id:"ci5b",label:"清掃・油分除去は完了しているか",      frequency:"daily",   lastDate:null},
+    {id:"ci5c",label:"刻印・識別番号は確認できるか",        frequency:"monthly", lastDate:null},
+  ]},
+  { id:"eq6", name:"コンベア #1", category:"設備", location:"C棟-1F", image:null, checkItems:[
+    {id:"ci6a",label:"ベルトに亀裂・摩耗はないか",          frequency:"weekly",  lastDate:null},
+    {id:"ci6b",label:"ローラーの回転は正常か",              frequency:"weekly",  lastDate:null},
+    {id:"ci6c",label:"駆動部の異音・振動はないか",          frequency:"daily",   lastDate:null},
+    {id:"ci6d",label:"非常停止装置は動作するか",            frequency:"monthly", lastDate:null},
+  ]},
+];
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// レスポンシブフック
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function useBreakpoint() {
+  const [w, setW] = useState(window.innerWidth);
+  useEffect(() => {
+    const fn = () => setW(window.innerWidth);
+    window.addEventListener("resize", fn);
+    return () => window.removeEventListener("resize", fn);
+  }, []);
+  return { isMobile: w < 640, isTablet: w >= 640 && w < 1024, isDesktop: w >= 1024, width: w };
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// メインアプリ
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function App() {
+  const [view, setView]                         = useState("dashboard");
+  const [role, setRole]                         = useState("worker");
+  const [records, setRecords]                   = useState([]);
+  const [activeInspection, setActiveInspection] = useState(null);
+  const [notification, setNotification]         = useState(null);
+  const [equipmentList, setEquipmentList]       = useState(INIT_EQUIPMENT);
+  const bp = useBreakpoint();
+
+  function showNotif(msg, type="success") {
+    setNotification({ msg, type });
+    setTimeout(() => setNotification(null), 3200);
+  }
+
+  function startInspection(eq) {
+    const items = (eq.checkItems||[]).map((ci, i) => {
+      const nextDate = calcNextDate(ci.lastDate, ci.frequency);
+      return { id:i, label:ci.label, status:"未点検", note:"",
+               frequency:ci.frequency, lastDate:ci.lastDate, nextDate, deadlineSt:deadlineStatus(nextDate) };
+    });
+    setActiveInspection({ id:generateId(), equipment:eq, date:todayStr(), time:nowStr(),
+      inspector:role==="admin"?"管理者":"作業員A", items, photos:[], overallNote:"", submitted:false });
+    setView("inspect");
+  }
+
+  function submitInspection() {
+    if (!activeInspection.items.every(i => i.status!=="未点検")) { showNotif("すべての項目を点検してください","error"); return; }
+    const hasAb = activeInspection.items.some(i => i.status==="異常");
+    const hasWa = activeInspection.items.some(i => i.status==="要注意");
+    const overall = hasAb ? "異常" : hasWa ? "要注意" : "正常";
+    setRecords(r => [{ ...activeInspection, submitted:true, overall }, ...r]);
+    setEquipmentList(prev => prev.map(eq => {
+      if (eq.id!==activeInspection.equipment.id) return eq;
+      return { ...eq, checkItems: eq.checkItems.map(ci => {
+        const done = activeInspection.items.find(i => i.label===ci.label && i.status!=="未点検");
+        return done ? { ...ci, lastDate:activeInspection.date } : ci;
+      })};
+    }));
+    setActiveInspection(null); setView("history"); showNotif("点検記録を保存しました");
+  }
+
+  const navTabs = [
+    { id:"dashboard", label:"ホーム",   icon:"🏠" },
+    { id:"inspect",   label:"点検",     icon:"✅" },
+    { id:"history",   label:"履歴",     icon:"📋" },
+    ...(role==="admin" ? [{ id:"admin", label:"管理", icon:"⚙️" }] : []),
+  ];
+
+  const handleNav = (id) => {
+    if (id==="inspect" && !activeInspection) { setView("dashboard"); return; }
+    setView(id);
+  };
+
+  return (
+    <div style={{ fontFamily:"'Noto Sans JP','Hiragino Sans',sans-serif", background:"#f0f4f8",
+      minHeight:"100vh", color:"#1e293b", paddingBottom: bp.isMobile ? 72 : 0 }}>
+
+      {/* ── トップヘッダー ── */}
+      <header style={{ background:"#0f172a", color:"white",
+        padding: bp.isMobile ? "10px 16px" : "12px 24px",
+        display:"flex", alignItems:"center", justifyContent:"space-between",
+        position:"sticky", top:0, zIndex:100, boxShadow:"0 2px 8px rgba(0,0,0,0.3)" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <span style={{ fontSize: bp.isMobile ? 20 : 22, color:"#f59e0b" }}>⚙</span>
+          <span style={{ fontSize: bp.isMobile ? 16 : 18, fontWeight:700, letterSpacing:"0.05em" }}>FactoryCheck</span>
+          {!bp.isMobile && <span style={{ fontSize:12, color:"#94a3b8", borderLeft:"1px solid #334155", paddingLeft:14 }}>設備・治具 点検管理</span>}
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+          {/* ロール切替 */}
+          <div style={{ display:"flex", background:"#1e293b", borderRadius:6, overflow:"hidden" }}>
+            {["worker","admin"].map(r => (
+              <button key={r} style={{ padding: bp.isMobile ? "5px 10px" : "5px 14px",
+                background: role===r ? "#334155" : "transparent",
+                border:"none", color:"white", cursor:"pointer",
+                fontSize: bp.isMobile ? 11 : 13, fontWeight: role===r ? 700 : 400 }}
+                onClick={() => setRole(r)}>
+                {r==="worker" ? (bp.isMobile ? "👷" : "👷 作業員") : (bp.isMobile ? "🔑" : "🔑 管理者")}
+              </button>
+            ))}
+          </div>
+          {/* PC/Tablet nav */}
+          {!bp.isMobile && (
+            <nav style={{ display:"flex", gap:2, marginLeft:8 }}>
+              {navTabs.map(tab => (
+                <button key={tab.id}
+                  style={{ background:"transparent", border:"none", color: view===tab.id ? "#f59e0b" : "#94a3b8",
+                    padding:"6px 14px", cursor:"pointer", fontSize:13,
+                    borderBottom: view===tab.id ? "2px solid #f59e0b" : "2px solid transparent",
+                    fontWeight: view===tab.id ? 700 : 400 }}
+                  onClick={() => handleNav(tab.id)}>
+                  {tab.icon} {tab.label}
+                </button>
+              ))}
+            </nav>
+          )}
+        </div>
+      </header>
+
+      {/* ── コンテンツ ── */}
+      <main style={{ padding: bp.isMobile ? "16px 14px" : bp.isTablet ? "20px" : "24px",
+        maxWidth: bp.isDesktop ? 1060 : "100%", margin:"0 auto" }}>
+        {view==="dashboard" && <Dashboard records={records} equipment={equipmentList} onStart={startInspection} bp={bp} />}
+        {view==="inspect" && activeInspection &&
+          <InspectView inspection={activeInspection} onChange={setActiveInspection}
+            onSubmit={submitInspection} onCancel={() => { setActiveInspection(null); setView("dashboard"); }} bp={bp} />}
+        {view==="inspect" && !activeInspection && <EquipmentPicker equipment={equipmentList} onSelect={startInspection} bp={bp} />}
+        {view==="history" && <HistoryView records={records} bp={bp} />}
+        {view==="admin" && role==="admin" &&
+          <AdminView records={records} equipment={equipmentList} onEquipmentChange={setEquipmentList} showNotif={showNotif} bp={bp} />}
+      </main>
+
+      {/* ── スマホ：ボトムナビ ── */}
+      {bp.isMobile && (
+        <nav style={{ position:"fixed", bottom:0, left:0, right:0, background:"#0f172a",
+          display:"flex", borderTop:"1px solid #334155", zIndex:100,
+          paddingBottom:"env(safe-area-inset-bottom)" }}>
+          {navTabs.map(tab => (
+            <button key={tab.id}
+              style={{ flex:1, background:"transparent", border:"none",
+                color: view===tab.id ? "#f59e0b" : "#64748b",
+                padding:"10px 0 8px", cursor:"pointer", display:"flex",
+                flexDirection:"column", alignItems:"center", gap:2 }}
+              onClick={() => handleNav(tab.id)}>
+              <span style={{ fontSize:20 }}>{tab.icon}</span>
+              <span style={{ fontSize:10, fontWeight: view===tab.id ? 700 : 400 }}>{tab.label}</span>
+            </button>
+          ))}
+        </nav>
+      )}
+
+      {/* 通知 */}
+      {notification && (
+        <div style={{ position:"fixed", bottom: bp.isMobile ? 84 : 24, left: bp.isMobile ? 16 : "auto",
+          right: bp.isMobile ? 16 : 24,
+          background: notification.type==="error" ? "#dc2626" : "#16a34a",
+          color:"white", padding:"12px 18px", borderRadius:10,
+          fontSize:14, fontWeight:600, boxShadow:"0 4px 16px rgba(0,0,0,0.25)", zIndex:9999 }}>
+          {notification.type==="error" ? "⚠ " : "✓ "}{notification.msg}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ダッシュボード
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function Dashboard({ records, equipment, onStart, bp }) {
+  const today = todayStr();
+  const todayRecs    = records.filter(r => r.date===today);
+  const inspectedIds = new Set(todayRecs.map(r => r.equipment.id));
+  const abnormal     = records.filter(r => r.overall==="異常").length;
+  const overdueCount = equipment.reduce((a,eq) =>
+    a + (eq.checkItems||[]).filter(ci => deadlineStatus(calcNextDate(ci.lastDate,ci.frequency))==="overdue").length, 0);
+
+  const cols = bp.isMobile ? "1fr" : bp.isTablet ? "1fr 1fr" : "1fr 1fr 1fr 1fr";
+
+  return (
+    <div>
+      <div style={{ marginBottom:16 }}>
+        <h2 style={{ fontSize: bp.isMobile ? 18 : 22, fontWeight:700, margin:"0 0 2px", color:"#0f172a" }}>ダッシュボード</h2>
+        <p style={{ fontSize:12, color:"#64748b", margin:0 }}>{today} の点検状況</p>
+      </div>
+
+      {/* サマリカード */}
+      <div style={{ display:"grid", gridTemplateColumns: bp.isMobile ? "1fr 1fr" : cols, gap:10, marginBottom:20 }}>
+        {[
+          { label:"本日の点検完了",  value:todayRecs.length,               unit:"件",  color:"#3b82f6" },
+          { label:"未点検設備",      value:equipment.length-inspectedIds.size, unit:"台", color:"#f59e0b" },
+          { label:"期限超過",        value:overdueCount,                   unit:"項目", color:"#dc2626" },
+          { label:"異常検出（累計）",value:abnormal,                       unit:"件",  color:"#7c3aed" },
+        ].map(c => (
+          <div key={c.label} style={{ background:"white", borderRadius:10, padding: bp.isMobile ? "12px 14px" : "14px 18px",
+            boxShadow:"0 1px 4px rgba(0,0,0,0.08)", borderTop:`3px solid ${c.color}` }}>
+            <div style={{ fontSize: bp.isMobile ? 26 : 30, fontWeight:800, color:c.color, lineHeight:1 }}>
+              {c.value}<span style={{ fontSize:13, fontWeight:400, marginLeft:2 }}>{c.unit}</span>
+            </div>
+            <div style={{ fontSize: bp.isMobile ? 11 : 12, color:"#64748b", marginTop:3 }}>{c.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <h3 style={S.sectionTitle}>設備・治具一覧</h3>
+      <div style={{ display:"grid", gridTemplateColumns: bp.isMobile ? "1fr" : bp.isTablet ? "1fr 1fr" : "1fr 1fr 1fr", gap:12 }}>
+        {equipment.map(eq => <EquipCard key={eq.id} eq={eq} records={records} today={today} onStart={onStart} bp={bp} />)}
+        {equipment.length===0 && <div style={S.empty}>設備・治具が登録されていません</div>}
+      </div>
+    </div>
+  );
+}
+
+function EquipCard({ eq, records, today, onStart, bp }) {
+  const rec    = records.find(r => r.equipment.id===eq.id && r.date===today);
+  const status = rec ? rec.overall : "未点検";
+  const sCfg   = STATUS_CONFIG[status];
+  const cs     = catStyle(eq.category);
+  const ds     = equipDS(eq);
+  const dStyle = DS[ds];
+  const overdueItems = (eq.checkItems||[]).filter(ci => deadlineStatus(calcNextDate(ci.lastDate,ci.frequency))==="overdue");
+  const soonItems    = (eq.checkItems||[]).filter(ci => deadlineStatus(calcNextDate(ci.lastDate,ci.frequency))==="soon");
+
+  return (
+    <div style={{ background:"white", borderRadius:12, overflow:"hidden",
+      boxShadow: ds==="overdue" ? `0 0 0 2px ${dStyle.color}, 0 2px 8px rgba(0,0,0,0.1)` : "0 2px 8px rgba(0,0,0,0.08)",
+      borderLeft:`4px solid ${dStyle.color}`, display:"flex", flexDirection: bp.isMobile ? "row" : "column" }}>
+      {/* サムネイル */}
+      <div style={{ position:"relative", width: bp.isMobile ? 90 : "100%",
+        height: bp.isMobile ? "auto" : 100, flexShrink:0, background:"#f1f5f9",
+        minHeight: bp.isMobile ? 90 : 0 }}>
+        {eq.image
+          ? <img src={eq.image} alt={eq.name} style={{ width:"100%", height:"100%", objectFit:"cover", display:"block", minHeight: bp.isMobile ? 90 : 100 }} />
+          : <div style={{ width:"100%", height:"100%", minHeight: bp.isMobile ? 90 : 100,
+              display:"flex", alignItems:"center", justifyContent:"center",
+              background:"linear-gradient(135deg,#e2e8f0,#f1f5f9)", fontSize: bp.isMobile ? 32 : 36, opacity:0.45 }}>
+              {eq.category==="治具" ? "🔧" : "⚙"}
+            </div>
+        }
+        <div style={{ position:"absolute", top:6, left:6 }}>
+          <span style={{ fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:20, background:cs.bg, color:cs.color }}>{eq.category}</span>
+        </div>
+        {(ds==="overdue"||ds==="soon") && (
+          <div style={{ position:"absolute", top:6, right:6 }}>
+            <span style={{ fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:20,
+              background:dStyle.bg, color:dStyle.color, border:`1px solid ${dStyle.border}` }}>
+              {dStyle.icon}
+            </span>
+          </div>
+        )}
+      </div>
+      {/* 情報 */}
+      <div style={{ padding: bp.isMobile ? "10px 12px" : "12px 14px", flex:1, display:"flex", flexDirection:"column", justifyContent:"space-between" }}>
+        <div>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:6, marginBottom:4 }}>
+            <div style={{ fontSize: bp.isMobile ? 14 : 15, fontWeight:700, color:"#0f172a", lineHeight:1.3 }}>{eq.name}</div>
+            <span style={{ fontSize:11, fontWeight:600, padding:"2px 8px", borderRadius:20, whiteSpace:"nowrap",
+              background:sCfg.bg, color:sCfg.color, flexShrink:0 }}>{sCfg.icon} {status}</span>
+          </div>
+          <div style={{ fontSize:11, color:"#94a3b8", marginBottom:6 }}>📍 {eq.location} · {(eq.checkItems||[]).length}項目</div>
+          {overdueItems.length > 0 && (
+            <div style={{ fontSize:11, fontWeight:600, color:"#dc2626", background:"#fee2e2", padding:"3px 8px", borderRadius:6, marginBottom:4 }}>
+              ⚠ {overdueItems.length}件 期限超過
+            </div>
+          )}
+          {overdueItems.length===0 && soonItems.length > 0 && (
+            <div style={{ fontSize:11, fontWeight:600, color:"#d97706", background:"#fef3c7", padding:"3px 8px", borderRadius:6, marginBottom:4 }}>
+              ⏰ {soonItems.length}件 期限間近
+            </div>
+          )}
+        </div>
+        {!rec
+          ? <button style={{ background:"#3b82f6", color:"white", border:"none", borderRadius:8,
+              padding: bp.isMobile ? "10px 0" : "8px 14px", cursor:"pointer",
+              fontSize: bp.isMobile ? 14 : 13, fontWeight:700, width:"100%", marginTop:6,
+              minHeight: bp.isMobile ? 44 : "auto" }}
+              onClick={() => onStart(eq)}>
+              点検開始 →
+            </button>
+          : <div style={{ fontSize:12, color:"#16a34a", fontWeight:600, marginTop:4 }}>✓ {rec.time} 完了 · {rec.inspector}</div>
+        }
+      </div>
+    </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 設備選択
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function EquipmentPicker({ equipment, onSelect, bp }) {
+  return (
+    <div>
+      <h2 style={{ fontSize: bp.isMobile ? 18 : 22, fontWeight:700, margin:"0 0 16px", color:"#0f172a" }}>点検する設備を選択</h2>
+      {equipment.length===0 && <div style={S.empty}>設備が登録されていません</div>}
+      <div style={{ display:"grid", gridTemplateColumns: bp.isMobile ? "1fr" : bp.isTablet ? "1fr 1fr" : "1fr 1fr 1fr", gap:12 }}>
+        {equipment.map(eq => {
+          const cs = catStyle(eq.category);
+          const ds = equipDS(eq); const dStyle = DS[ds];
+          return (
+            <button key={eq.id} style={{ background:"white", borderRadius:12, overflow:"hidden",
+              boxShadow:"0 2px 8px rgba(0,0,0,0.08)", borderLeft:`4px solid #3b82f6`,
+              display:"flex", flexDirection: bp.isMobile ? "row" : "column",
+              cursor:"pointer", border:"none", textAlign:"left", padding:0 }}
+              onClick={() => onSelect(eq)}>
+              <div style={{ position:"relative", width: bp.isMobile ? 90 : "100%", minHeight:90,
+                flexShrink:0, background:"#f1f5f9" }}>
+                {eq.image
+                  ? <img src={eq.image} alt={eq.name} style={{ width:"100%", height:"100%", minHeight:90, objectFit:"cover", display:"block" }} />
+                  : <div style={{ width:"100%", minHeight:90, display:"flex", alignItems:"center", justifyContent:"center",
+                      background:"linear-gradient(135deg,#e2e8f0,#f1f5f9)", fontSize:32, opacity:0.45 }}>
+                      {eq.category==="治具" ? "🔧" : "⚙"}
+                    </div>
+                }
+                <div style={{ position:"absolute", top:6, left:6 }}>
+                  <span style={{ fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:20, background:cs.bg, color:cs.color }}>{eq.category}</span>
+                </div>
+                {(ds==="overdue"||ds==="soon") && (
+                  <div style={{ position:"absolute", top:6, right:6 }}>
+                    <span style={{ fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:20,
+                      background:dStyle.bg, color:dStyle.color }}>{dStyle.icon}</span>
+                  </div>
+                )}
+              </div>
+              <div style={{ padding:"12px 14px", flex:1 }}>
+                <div style={{ fontSize:15, fontWeight:700, color:"#0f172a", marginBottom:3 }}>{eq.name}</div>
+                <div style={{ fontSize:11, color:"#94a3b8", marginBottom:8 }}>📍 {eq.location} · {(eq.checkItems||[]).length}項目</div>
+                <div style={{ background:"#3b82f6", color:"white", borderRadius:7, padding:"8px 12px",
+                  fontSize:13, fontWeight:700, display:"inline-block" }}>選択して点検開始 →</div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 点検ビュー（スマホ最適化）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function InspectView({ inspection, onChange, onSubmit, onCancel, bp }) {
+  const fileRef = useRef();
+  const eq = inspection.equipment;
+
+  function setItemStatus(id, status) {
+    onChange(prev => ({ ...prev, items: prev.items.map(i => i.id===id ? { ...i, status } : i) }));
+  }
+  function setItemNote(id, note) {
+    onChange(prev => ({ ...prev, items: prev.items.map(i => i.id===id ? { ...i, note } : i) }));
+  }
+  function addPhoto(e) {
+    const file = e.target.files[0]; if (!file) return;
+    onChange(prev => ({ ...prev, photos:[...prev.photos, { url:URL.createObjectURL(file), name:file.name, time:nowStr() }] }));
+    e.target.value = "";
+  }
+
+  const progress = inspection.items.filter(i => i.status!=="未点検").length;
+  const pct = inspection.items.length > 0 ? Math.round(progress/inspection.items.length*100) : 0;
+
+  return (
+    <div>
+      {/* ヘッダー */}
+      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:12 }}>
+        {eq.image
+          ? <img src={eq.image} alt={eq.name} style={{ width:48, height:48, borderRadius:8, objectFit:"cover", flexShrink:0 }} />
+          : <div style={{ width:48, height:48, borderRadius:8, background:"#e2e8f0", display:"flex", alignItems:"center", justifyContent:"center", fontSize:24, flexShrink:0 }}>
+              {eq.category==="治具" ? "🔧" : "⚙"}
+            </div>
+        }
+        <div style={{ flex:1, minWidth:0 }}>
+          <h2 style={{ fontSize: bp.isMobile ? 16 : 20, fontWeight:700, margin:"0 0 2px", color:"#0f172a",
+            overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{eq.name}</h2>
+          <p style={{ fontSize:11, color:"#64748b", margin:0 }}>{inspection.date} {inspection.time} · {eq.location}</p>
+        </div>
+        <button style={{ background:"transparent", border:"1px solid #cbd5e1", borderRadius:8,
+          padding:"7px 12px", cursor:"pointer", fontSize:12, color:"#64748b", flexShrink:0, minHeight:40 }}
+          onClick={onCancel}>✕ キャンセル</button>
+      </div>
+
+      {/* 進捗 */}
+      <div style={{ background:"white", borderRadius:10, padding:"12px 14px", marginBottom:16, boxShadow:"0 1px 4px rgba(0,0,0,0.07)" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+          <span style={{ fontSize:12, fontWeight:600, color:"#334155" }}>点検進捗</span>
+          <span style={{ fontSize:12, color:"#64748b" }}>{progress} / {inspection.items.length} ({pct}%)</span>
+        </div>
+        <div style={{ height:10, background:"#e2e8f0", borderRadius:5, overflow:"hidden" }}>
+          <div style={{ height:"100%", width:`${pct}%`, background:"linear-gradient(90deg,#3b82f6,#22c55e)", borderRadius:5, transition:"width 0.3s" }} />
+        </div>
+      </div>
+
+      {/* チェックリスト */}
+      <h3 style={S.sectionTitle}>点検チェックリスト</h3>
+      <div style={{ display:"flex", flexDirection:"column", gap: bp.isMobile ? 10 : 8 }}>
+        {inspection.items.map(item => {
+          const cfg    = STATUS_CONFIG[item.status];
+          const ds     = item.deadlineSt || "none";
+          const dStyle = DS[ds];
+          const diff   = item.nextDate ? diffFromToday(item.nextDate) : null;
+          return (
+            <div key={item.id} style={{ background:"white", borderRadius:12, padding: bp.isMobile ? 14 : 14,
+              boxShadow:"0 1px 4px rgba(0,0,0,0.07)", borderLeft:`4px solid ${cfg.color}`,
+              outline: ds==="overdue" ? `1px solid #fca5a5` : "none" }}>
+              {/* 項目ラベルと期限情報 */}
+              <div style={{ marginBottom:10 }}>
+                <div style={{ fontSize: bp.isMobile ? 15 : 14, fontWeight:600, color:"#1e293b", lineHeight:1.4, marginBottom:5 }}>
+                  {item.label}
+                </div>
+                <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                  {item.frequency && item.frequency!=="none" && (
+                    <span style={{ fontSize:11, fontWeight:600, padding:"2px 8px", borderRadius:20, background:"#e0e7ff", color:"#4338ca" }}>
+                      {freqLabel(item.frequency)}
+                    </span>
+                  )}
+                  {ds!=="none" && (
+                    <span style={{ fontSize:11, fontWeight:700, padding:"2px 8px", borderRadius:20,
+                      background:dStyle.bg, color:dStyle.color, border:`1px solid ${dStyle.border}` }}>
+                      {dStyle.icon} {ds==="overdue" ? `${Math.abs(diff)}日超過` : ds==="soon" ? `残り${diff}日` : "—"}
+                    </span>
+                  )}
+                </div>
+                {(item.lastDate || item.nextDate) && (
+                  <div style={{ display:"flex", gap:10, marginTop:4 }}>
+                    <span style={{ fontSize:11, color:"#94a3b8" }}>前回: {item.lastDate||"未実施"}</span>
+                    {item.nextDate && <span style={{ fontSize:11, color:dStyle.color, fontWeight:(ds==="overdue"||ds==="soon")?700:400 }}>次回: {item.nextDate}</span>}
+                  </div>
+                )}
+              </div>
+              {/* 判定ボタン（スマホは大きく） */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap: bp.isMobile ? 8 : 6 }}>
+                {["正常","要注意","異常"].map(s => {
+                  const c = STATUS_CONFIG[s]; const active = item.status===s;
+                  return (
+                    <button key={s} style={{
+                      padding: bp.isMobile ? "12px 4px" : "8px 4px",
+                      background: active ? c.bg : "#f8fafc",
+                      color: active ? c.color : "#94a3b8",
+                      border: `2px solid ${active ? c.color : "#e2e8f0"}`,
+                      borderRadius:10, cursor:"pointer",
+                      fontSize: bp.isMobile ? 13 : 12, fontWeight: active ? 800 : 500,
+                      transition:"all 0.15s", minHeight: bp.isMobile ? 48 : "auto" }}
+                      onClick={() => setItemStatus(item.id, s)}>
+                      {c.icon} {s}
+                    </button>
+                  );
+                })}
+              </div>
+              {(item.status==="要注意"||item.status==="異常") && (
+                <textarea style={{ width:"100%", marginTop:10, padding:"10px", border:"1px solid #fca5a5",
+                  borderRadius:8, fontSize:14, background:"#fff5f5", boxSizing:"border-box",
+                  outline:"none", resize:"none", fontFamily:"inherit", minHeight:60 }}
+                  placeholder="不具合の詳細を入力..." value={item.note}
+                  onChange={e => setItemNote(item.id, e.target.value)} />
+              )}
+            </div>
+          );
+        })}
+        {inspection.items.length===0 && <div style={S.empty}>点検項目がありません</div>}
+      </div>
+
+      {/* 写真 */}
+      <h3 style={S.sectionTitle}>写真添付</h3>
+      <div style={{ background:"white", borderRadius:12, padding:14, boxShadow:"0 1px 4px rgba(0,0,0,0.07)", marginBottom:4 }}>
+        <button style={{ background:"#0f172a", color:"white", border:"none", borderRadius:8,
+          padding: bp.isMobile ? "12px 20px" : "10px 16px", cursor:"pointer",
+          fontSize: bp.isMobile ? 15 : 13, fontWeight:700, marginBottom:12,
+          minHeight: bp.isMobile ? 48 : "auto", display:"flex", alignItems:"center", gap:8 }}
+          onClick={() => fileRef.current.click()}>
+          📷 写真を追加
+        </button>
+        <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display:"none" }} onChange={addPhoto} />
+        <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+          {inspection.photos.map((p,i) => (
+            <div key={i} style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:8, overflow:"hidden", width: bp.isMobile ? 90 : 110 }}>
+              <img src={p.url} alt={p.name} style={{ width:"100%", height: bp.isMobile ? 70 : 80, objectFit:"cover", display:"block" }} />
+              <div style={{ fontSize:10, color:"#94a3b8", padding:"3px 5px", textAlign:"center" }}>{p.time}</div>
+            </div>
+          ))}
+          {inspection.photos.length===0 && <span style={{ color:"#94a3b8", fontSize:13 }}>写真なし</span>}
+        </div>
+      </div>
+
+      {/* コメント */}
+      <h3 style={S.sectionTitle}>総合コメント</h3>
+      <textarea style={{ width:"100%", minHeight:80, padding:"12px", border:"1px solid #e2e8f0",
+        borderRadius:10, fontSize:14, background:"white", boxSizing:"border-box",
+        resize:"vertical", outline:"none", fontFamily:"inherit", marginBottom:4 }}
+        placeholder="点検全体のコメントや特記事項を入力..." value={inspection.overallNote}
+        onChange={e => onChange(prev => ({ ...prev, overallNote:e.target.value }))} />
+
+      <button style={{ width:"100%", background:"#16a34a", color:"white", border:"none", borderRadius:12,
+        padding: bp.isMobile ? "18px" : "14px", cursor:"pointer",
+        fontSize: bp.isMobile ? 17 : 16, fontWeight:800, marginTop:8, letterSpacing:"0.03em",
+        minHeight: bp.isMobile ? 56 : "auto", boxShadow:"0 4px 12px rgba(22,163,74,0.3)" }}
+        onClick={onSubmit}>
+        ✓ 点検記録を保存する
+      </button>
+    </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 点検履歴
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function HistoryView({ records, bp }) {
+  const [selected, setSelected] = useState(null);
+  if (selected) {
+    const rec = selected; const cfg = STATUS_CONFIG[rec.overall];
+    return (
+      <div>
+        <button style={{ background:"transparent", border:"none", color:"#3b82f6", cursor:"pointer",
+          fontSize:14, padding:"0 0 14px", fontWeight:600, display:"flex", alignItems:"center", gap:4 }}
+          onClick={() => setSelected(null)}>← 一覧に戻る</button>
+        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:14 }}>
+          {rec.equipment.image
+            ? <img src={rec.equipment.image} alt={rec.equipment.name} style={{ width:52, height:52, borderRadius:8, objectFit:"cover" }} />
+            : <div style={{ width:52, height:52, borderRadius:8, background:"#e2e8f0", display:"flex", alignItems:"center", justifyContent:"center", fontSize:26 }}>
+                {rec.equipment.category==="治具" ? "🔧" : "⚙"}
+              </div>
+          }
+          <div>
+            <h2 style={{ fontSize: bp.isMobile ? 16 : 20, fontWeight:700, margin:"0 0 3px", color:"#0f172a" }}>{rec.equipment.name}</h2>
+            <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
+              <span style={{ fontSize:12, color:"#64748b" }}>{rec.date} {rec.time}</span>
+              <span style={{ fontSize:12, color:"#64748b" }}>{rec.inspector}</span>
+              <span style={{ fontSize:12, fontWeight:600, padding:"2px 8px", borderRadius:20, background:cfg.bg, color:cfg.color }}>{cfg.icon} {rec.overall}</span>
+            </div>
+          </div>
+        </div>
+        {/* 結果テーブル（スマホはカード形式） */}
+        {bp.isMobile ? (
+          <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:16 }}>
+            {rec.items.map(item => {
+              const c = STATUS_CONFIG[item.status];
+              return (
+                <div key={item.id} style={{ background:"white", borderRadius:10, padding:12,
+                  borderLeft:`4px solid ${c.color}`, boxShadow:"0 1px 3px rgba(0,0,0,0.06)" }}>
+                  <div style={{ fontSize:14, fontWeight:600, color:"#1e293b", marginBottom:4 }}>{item.label}</div>
+                  <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
+                    <span style={{ fontSize:12, fontWeight:700, padding:"2px 8px", borderRadius:20, background:c.bg, color:c.color }}>{c.icon} {item.status}</span>
+                    <span style={{ fontSize:11, padding:"2px 8px", borderRadius:20, background:"#e0e7ff", color:"#4338ca" }}>{freqLabel(item.frequency)}</span>
+                    {item.note && <span style={{ fontSize:12, color:"#475569" }}>{item.note}</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <table style={S.table}>
+            <thead><tr>
+              <th style={S.th}>点検項目</th><th style={S.th}>頻度</th>
+              <th style={S.th}>前回点検</th><th style={S.th}>次回点検</th>
+              <th style={S.th}>結果</th><th style={S.th}>備考</th>
+            </tr></thead>
+            <tbody>
+              {rec.items.map(item => {
+                const c=STATUS_CONFIG[item.status]; const ds=item.deadlineSt||"none"; const dStyle=DS[ds];
+                return (
+                  <tr key={item.id} style={{ background:item.status==="異常"?"#fff5f5":"white" }}>
+                    <td style={S.td}>{item.label}</td>
+                    <td style={S.td}><span style={{ fontSize:11, padding:"2px 8px", borderRadius:20, background:"#e0e7ff", color:"#4338ca" }}>{freqLabel(item.frequency)}</span></td>
+                    <td style={S.td}>{item.lastDate||"—"}</td>
+                    <td style={{ ...S.td, color:dStyle.color, fontWeight:(ds==="overdue"||ds==="soon")?700:400 }}>{item.nextDate||"—"}</td>
+                    <td style={{ ...S.td, color:c.color, fontWeight:600 }}>{c.icon} {item.status}</td>
+                    <td style={S.td}>{item.note||"—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+        {rec.photos.length>0 && (
+          <><h3 style={S.sectionTitle}>添付写真</h3>
+          <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+            {rec.photos.map((p,i) => (
+              <div key={i} style={{ borderRadius:8, overflow:"hidden", width: bp.isMobile ? 90 : 110 }}>
+                <img src={p.url} alt={p.name} style={{ width:"100%", height: bp.isMobile ? 70 : 80, objectFit:"cover", display:"block" }} />
+                <div style={{ fontSize:10, color:"#94a3b8", padding:"3px 5px", textAlign:"center", background:"#f8fafc" }}>{p.time}</div>
+              </div>
+            ))}
+          </div></>
+        )}
+        {rec.overallNote && <><h3 style={S.sectionTitle}>総合コメント</h3>
+          <div style={{ background:"white", border:"1px solid #e2e8f0", borderRadius:10, padding:14, fontSize:14 }}>{rec.overallNote}</div></>}
+      </div>
+    );
+  }
+  return (
+    <div>
+      <h2 style={{ fontSize: bp.isMobile ? 18 : 22, fontWeight:700, margin:"0 0 16px", color:"#0f172a" }}>点検履歴</h2>
+      {records.length===0 && <div style={S.empty}>点検記録がありません</div>}
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        {records.map(rec => {
+          const cfg = STATUS_CONFIG[rec.overall];
+          return (
+            <div key={rec.id} style={{ background:"white", borderRadius:12, padding: bp.isMobile ? 14 : 16,
+              cursor:"pointer", boxShadow:"0 2px 6px rgba(0,0,0,0.07)", borderLeft:`4px solid ${cfg.color}` }}
+              onClick={() => setSelected(rec)}>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                {rec.equipment.image
+                  ? <img src={rec.equipment.image} alt="" style={{ width:44, height:44, borderRadius:7, objectFit:"cover", flexShrink:0 }} />
+                  : <div style={{ width:44, height:44, borderRadius:7, background:"#e2e8f0", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>
+                      {rec.equipment.category==="治具" ? "🔧" : "⚙"}
+                    </div>
+                }
+                <div style={{ flex:1 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:2 }}>
+                    <span style={{ fontSize:15, fontWeight:700, color:"#0f172a" }}>{rec.equipment.name}</span>
+                    <span style={{ fontSize:12, fontWeight:600, padding:"2px 8px", borderRadius:20, background:cfg.bg, color:cfg.color }}>{cfg.icon} {rec.overall}</span>
+                  </div>
+                  <div style={{ fontSize:12, color:"#94a3b8" }}>{rec.date} {rec.time} · {rec.inspector}</div>
+                  <div style={{ fontSize:11, color:"#94a3b8", marginTop:2 }}>{rec.items.length}項目 · 写真{rec.photos.length}枚</div>
+                </div>
+              </div>
+              <div style={{ textAlign:"right", marginTop:6 }}>
+                <span style={{ fontSize:12, color:"#3b82f6", fontWeight:600 }}>詳細を見る →</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 管理ビュー
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function AdminView({ records, equipment, onEquipmentChange, showNotif, bp }) {
+  const [adminTab, setAdminTab] = useState("summary");
+  const overdueTotal = equipment.reduce((a,eq) =>
+    a + (eq.checkItems||[]).filter(ci => deadlineStatus(calcNextDate(ci.lastDate,ci.frequency))==="overdue").length, 0);
+
+  const tabs = [
+    { id:"summary",  label:"サマリ" },
+    { id:"master",   label:"設備マスタ" },
+    { id:"schedule", label:`スケジュール${overdueTotal>0?` (${overdueTotal})`:""}` },
+    { id:"alerts",   label:"異常アラート" },
+  ];
+
+  return (
+    <div>
+      <h2 style={{ fontSize: bp.isMobile ? 18 : 22, fontWeight:700, margin:"0 0 14px", color:"#0f172a" }}>管理ダッシュボード</h2>
+      {/* タブ（スマホはスクロール） */}
+      <div style={{ display:"flex", gap:0, marginBottom:18, borderBottom:"2px solid #e2e8f0",
+        overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
+        {tabs.map(t => (
+          <button key={t.id} style={{ background:"transparent", border:"none",
+            padding: bp.isMobile ? "8px 14px" : "8px 18px",
+            cursor:"pointer", fontSize: bp.isMobile ? 12 : 14,
+            color: adminTab===t.id ? "#0f172a" : (t.id==="schedule" && overdueTotal>0 ? "#dc2626" : "#64748b"),
+            borderBottom: adminTab===t.id ? "2px solid #f59e0b" : "2px solid transparent",
+            fontWeight: adminTab===t.id ? 700 : 400, marginBottom:-2, whiteSpace:"nowrap" }}
+            onClick={() => setAdminTab(t.id)}>{t.label}</button>
+        ))}
+      </div>
+      {adminTab==="summary"  && <AdminSummary records={records} equipment={equipment} bp={bp} />}
+      {adminTab==="master"   && <EquipmentMaster equipment={equipment} onChange={onEquipmentChange} showNotif={showNotif} bp={bp} />}
+      {adminTab==="schedule" && <ScheduleView equipment={equipment} bp={bp} />}
+      {adminTab==="alerts"   && <AlertsView records={records} bp={bp} />}
+    </div>
+  );
+}
+
+function AdminSummary({ records, equipment, bp }) {
+  const byEquip = equipment.map(eq => {
+    const recs = records.filter(r => r.equipment.id===eq.id);
+    return { ...eq, total:recs.length, last:recs[0], abnormal:recs.filter(r => r.overall==="異常").length };
+  });
+  if (bp.isMobile) {
+    return (
+      <>
+        <h3 style={S.sectionTitle}>設備別サマリ</h3>
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {byEquip.map(eq => {
+            const cfg = eq.last ? STATUS_CONFIG[eq.last.overall] : STATUS_CONFIG["未点検"];
+            const cs  = catStyle(eq.category);
+            return (
+              <div key={eq.id} style={{ background:"white", borderRadius:10, padding:12, boxShadow:"0 1px 4px rgba(0,0,0,0.07)" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    {eq.image ? <img src={eq.image} style={{ width:32,height:32,borderRadius:5,objectFit:"cover" }} alt="" />
+                      : <span style={{ fontSize:22 }}>{eq.category==="治具"?"🔧":"⚙"}</span>}
+                    <div>
+                      <div style={{ fontSize:14, fontWeight:700 }}>{eq.name}</div>
+                      <span style={{ fontSize:11, fontWeight:600, padding:"1px 7px", borderRadius:20, background:cs.bg, color:cs.color }}>{eq.category}</span>
+                    </div>
+                  </div>
+                  <span style={{ fontSize:12, fontWeight:600, padding:"2px 8px", borderRadius:20, background:cfg.bg, color:cfg.color }}>{cfg.icon} {eq.last?eq.last.overall:"未点検"}</span>
+                </div>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6, fontSize:12, color:"#64748b" }}>
+                  <div style={{ textAlign:"center" }}><div style={{ fontWeight:700, fontSize:18, color:"#3b82f6" }}>{eq.checkItems?.length||0}</div>点検項目</div>
+                  <div style={{ textAlign:"center" }}><div style={{ fontWeight:700, fontSize:18, color:"#475569" }}>{eq.total}</div>点検回数</div>
+                  <div style={{ textAlign:"center" }}><div style={{ fontWeight:700, fontSize:18, color:eq.abnormal>0?"#dc2626":"#94a3b8" }}>{eq.abnormal}</div>異常件数</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </>
+    );
+  }
+  return (
+    <>
+      <h3 style={S.sectionTitle}>設備別サマリ</h3>
+      <table style={S.table}>
+        <thead><tr>
+          <th style={S.th}>設備名</th><th style={S.th}>カテゴリ</th>
+          <th style={S.th}>項目数</th><th style={S.th}>点検回数</th>
+          <th style={S.th}>異常</th><th style={S.th}>最終点検</th><th style={S.th}>最終結果</th>
+        </tr></thead>
+        <tbody>
+          {byEquip.map(eq => {
+            const cfg=eq.last?STATUS_CONFIG[eq.last.overall]:STATUS_CONFIG["未点検"]; const cs=catStyle(eq.category);
+            return (
+              <tr key={eq.id}>
+                <td style={S.td}><div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  {eq.image?<img src={eq.image} style={{ width:28,height:28,borderRadius:4,objectFit:"cover" }} alt=""/>:<span style={{ fontSize:18 }}>{eq.category==="治具"?"🔧":"⚙"}</span>}
+                  <strong>{eq.name}</strong></div></td>
+                <td style={S.td}><span style={{ fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:20,background:cs.bg,color:cs.color }}>{eq.category}</span></td>
+                <td style={{ ...S.td, textAlign:"center" }}>{eq.checkItems?.length||0}</td>
+                <td style={{ ...S.td, textAlign:"center" }}>{eq.total}</td>
+                <td style={{ ...S.td, textAlign:"center", color:eq.abnormal>0?"#dc2626":"#94a3b8", fontWeight:eq.abnormal>0?700:400 }}>{eq.abnormal}</td>
+                <td style={S.td}>{eq.last?`${eq.last.date} ${eq.last.time}`:"—"}</td>
+                <td style={S.td}><span style={{ fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:20,background:cfg.bg,color:cfg.color }}>{cfg.icon} {eq.last?eq.last.overall:"未点検"}</span></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
+function ScheduleView({ equipment, bp }) {
+  const [filter, setFilter] = useState("all");
+  const allItems = equipment.flatMap(eq =>
+    (eq.checkItems||[]).map(ci => {
+      const nextDate=calcNextDate(ci.lastDate,ci.frequency); const ds=deadlineStatus(nextDate);
+      const diff=nextDate?diffFromToday(nextDate):null;
+      return { ...ci, eqName:eq.name, eqCategory:eq.category, eqImage:eq.image, nextDate, ds, diff };
+    })
+  );
+  const filtered = filter==="all" ? allItems : allItems.filter(i => i.ds===filter);
+  const sorted = [...filtered].sort((a,b) => {
+    const o={ overdue:0, soon:1, ok:2, none:3 };
+    return o[a.ds]!==o[b.ds] ? o[a.ds]-o[b.ds] : (a.diff??999)-(b.diff??999);
+  });
+  const counts = { overdue:allItems.filter(i=>i.ds==="overdue").length, soon:allItems.filter(i=>i.ds==="soon").length, ok:allItems.filter(i=>i.ds==="ok").length, none:allItems.filter(i=>i.ds==="none").length };
+
+  return (
+    <div>
+      <h3 style={S.sectionTitle}>点検スケジュール一覧</h3>
+      <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:14 }}>
+        {[
+          { key:"all",     label:`すべて (${allItems.length})`,  color:"#64748b" },
+          { key:"overdue", label:`⚠ 超過 (${counts.overdue})`,  color:"#dc2626" },
+          { key:"soon",    label:`⏰ 間近 (${counts.soon})`,     color:"#d97706" },
+          { key:"ok",      label:`✓ 正常 (${counts.ok})`,       color:"#16a34a" },
+          { key:"none",    label:`— 未設定 (${counts.none})`,   color:"#94a3b8" },
+        ].map(f => (
+          <button key={f.key} style={{ padding:"5px 12px", border:`1px solid ${filter===f.key?f.color:"#e2e8f0"}`,
+            borderRadius:20, cursor:"pointer", fontSize: bp.isMobile ? 11 : 12, fontWeight:600,
+            background: filter===f.key ? f.color : "white", color: filter===f.key ? "white" : f.color }}
+            onClick={() => setFilter(f.key)}>{f.label}</button>
+        ))}
+      </div>
+      {sorted.length===0 && <div style={S.empty}>該当する点検項目がありません</div>}
+      {bp.isMobile ? (
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {sorted.map((item,idx) => {
+            const dStyle = DS[item.ds];
+            return (
+              <div key={idx} style={{ background: item.ds==="overdue"?"#fff5f5":item.ds==="soon"?"#fffbeb":"white",
+                borderRadius:10, padding:12, borderLeft:`4px solid ${dStyle.color}`, boxShadow:"0 1px 3px rgba(0,0,0,0.06)" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:5 }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:"#1e293b", marginBottom:2 }}>{item.eqName}</div>
+                    <div style={{ fontSize:12, color:"#475569" }}>{item.label}</div>
+                  </div>
+                  <span style={{ fontSize:11, fontWeight:700, padding:"2px 8px", borderRadius:20, flexShrink:0, marginLeft:8,
+                    background:dStyle.bg, color:dStyle.color, border:`1px solid ${dStyle.border}` }}>
+                    {dStyle.icon} {dStyle.label}
+                  </span>
+                </div>
+                <div style={{ display:"flex", gap:8, flexWrap:"wrap", fontSize:11, color:"#64748b" }}>
+                  <span style={{ padding:"2px 8px", borderRadius:20, background:"#e0e7ff", color:"#4338ca", fontWeight:600 }}>{freqLabel(item.frequency)}</span>
+                  <span>前回: {item.lastDate||"未実施"}</span>
+                  <span style={{ color:dStyle.color, fontWeight:(item.ds==="overdue"||item.ds==="soon")?700:400 }}>
+                    次回: {item.nextDate||"—"}
+                    {item.ds==="overdue" && ` (${Math.abs(item.diff)}日超過)`}
+                    {item.ds==="soon" && ` (残り${item.diff}日)`}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div style={{ overflowX:"auto" }}>
+          <table style={S.table}>
+            <thead><tr>
+              <th style={S.th}>設備名</th><th style={S.th}>点検項目</th>
+              <th style={S.th}>頻度</th><th style={S.th}>前回点検日</th>
+              <th style={S.th}>次回点検日</th><th style={S.th}>状態</th>
+            </tr></thead>
+            <tbody>
+              {sorted.map((item,idx) => {
+                const dStyle=DS[item.ds];
+                return (
+                  <tr key={idx} style={{ background:item.ds==="overdue"?"#fff5f5":item.ds==="soon"?"#fffbeb":"white" }}>
+                    <td style={S.td}><div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                      {item.eqImage?<img src={item.eqImage} style={{ width:24,height:24,borderRadius:3,objectFit:"cover" }} alt=""/>:<span>{item.eqCategory==="治具"?"🔧":"⚙"}</span>}
+                      <span style={{ fontWeight:600 }}>{item.eqName}</span></div></td>
+                    <td style={S.td}>{item.label}</td>
+                    <td style={S.td}><span style={{ fontSize:11,padding:"2px 8px",borderRadius:20,background:"#e0e7ff",color:"#4338ca",fontWeight:600 }}>{freqLabel(item.frequency)}</span></td>
+                    <td style={S.td}>{item.lastDate||<span style={{ color:"#94a3b8" }}>未実施</span>}</td>
+                    <td style={{ ...S.td, color:dStyle.color, fontWeight:(item.ds==="overdue"||item.ds==="soon")?700:400 }}>
+                      {item.nextDate||<span style={{ color:"#94a3b8" }}>—</span>}
+                      {item.ds==="overdue" && <span style={{ fontSize:11 }}> ({Math.abs(item.diff)}日超過)</span>}
+                      {item.ds==="soon" && <span style={{ fontSize:11 }}> (残り{item.diff}日)</span>}
+                    </td>
+                    <td style={S.td}><span style={{ fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:20,background:dStyle.bg,color:dStyle.color,border:`1px solid ${dStyle.border}` }}>{dStyle.icon} {dStyle.label}</span></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 設備マスタ編集
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function EquipmentMaster({ equipment, onChange, showNotif, bp }) {
+  const [selectedId, setSelectedId] = useState(equipment[0]?.id||null);
+  const [showNewEq, setShowNewEq]   = useState(false);
+  const [newForm, setNewForm]       = useState({ name:"", category:"設備", location:"" });
+  const [showDetail, setShowDetail] = useState(!bp.isMobile);
+
+  const selected = equipment.find(e => e.id===selectedId);
+
+  function updateEquip(id, patch) { onChange(prev => prev.map(e => e.id===id ? { ...e, ...patch } : e)); }
+  function deleteEquip(id, name) {
+    if (!window.confirm(`「${name}」を削除しますか？`)) return;
+    onChange(prev => prev.filter(e => e.id!==id));
+    setSelectedId(equipment.filter(e => e.id!==id)[0]?.id||null);
+    showNotif("設備を削除しました");
+  }
+  function addEquip() {
+    if (!newForm.name.trim())     { showNotif("設備名を入力してください","error"); return; }
+    if (!newForm.location.trim()) { showNotif("場所を入力してください","error"); return; }
+    const newEq = { id:generateId(), ...newForm, image:null, checkItems:[] };
+    onChange(prev => [...prev, newEq]);
+    setSelectedId(newEq.id); setShowNewEq(false); setNewForm({ name:"", category:"設備", location:"" });
+    if (bp.isMobile) setShowDetail(true);
+    showNotif("設備を追加しました");
+  }
+
+  const handleSelect = (id) => {
+    setSelectedId(id);
+    if (bp.isMobile) setShowDetail(true);
+  };
+
+  // スマホ：詳細表示中は設備リストを隠す
+  if (bp.isMobile && showDetail && selected) {
+    return (
+      <div>
+        <button style={{ background:"transparent", border:"none", color:"#3b82f6", cursor:"pointer",
+          fontSize:14, padding:"0 0 14px", fontWeight:600 }}
+          onClick={() => setShowDetail(false)}>← 設備一覧に戻る</button>
+        <EquipDetailEditor equipment={selected} onUpdate={p => updateEquip(selected.id,p)}
+          onDelete={() => { deleteEquip(selected.id,selected.name); setShowDetail(false); }}
+          showNotif={showNotif} bp={bp} />
+      </div>
+    );
+  }
+
+  return (
+    <div style={bp.isDesktop ? { display:"flex", gap:16, alignItems:"flex-start" } : {}}>
+      {/* 設備リスト */}
+      <div style={bp.isDesktop ? { width:220, flexShrink:0, background:"white", borderRadius:10, boxShadow:"0 1px 4px rgba(0,0,0,0.08)", overflow:"hidden" } : {}}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+          padding: bp.isDesktop ? "12px 14px" : "0 0 10px",
+          borderBottom: bp.isDesktop ? "1px solid #e2e8f0" : "none",
+          background: bp.isDesktop ? "#f8fafc" : "transparent" }}>
+          <span style={{ fontSize:13, fontWeight:700, color:"#334155" }}>設備一覧</span>
+          <button style={{ background:"#3b82f6", color:"white", border:"none", borderRadius:6,
+            padding:"5px 12px", cursor:"pointer", fontSize:12, fontWeight:700 }}
+            onClick={() => setShowNewEq(!showNewEq)}>＋ 追加</button>
+        </div>
+        {showNewEq && (
+          <div style={{ padding:12, borderBottom:"1px solid #e2e8f0", display:"flex", flexDirection:"column", gap:6, background:"#f8fafc", borderRadius: bp.isMobile ? 10 : 0, marginBottom: bp.isMobile ? 10 : 0 }}>
+            <input style={S.inputSm} placeholder="設備名 *" value={newForm.name} onChange={e => setNewForm({...newForm,name:e.target.value})} />
+            <select style={S.inputSm} value={newForm.category} onChange={e => setNewForm({...newForm,category:e.target.value})}>
+              <option value="設備">設備</option><option value="治具">治具</option>
+            </select>
+            <input style={S.inputSm} placeholder="場所 *" value={newForm.location} onChange={e => setNewForm({...newForm,location:e.target.value})} />
+            <div style={{ display:"flex", gap:6 }}>
+              <button style={{ ...S.saveBtn, flex:1 }} onClick={addEquip}>追加</button>
+              <button style={S.cancelBtnSm} onClick={() => setShowNewEq(false)}>戻る</button>
+            </div>
+          </div>
+        )}
+        <div style={{ display: bp.isMobile ? "grid" : "block", gridTemplateColumns: bp.isTablet ? "1fr 1fr" : "1fr",
+          gap: bp.isMobile ? 8 : 0, maxHeight: bp.isDesktop ? 520 : "none", overflowY: bp.isDesktop ? "auto" : "visible" }}>
+          {equipment.map(eq => {
+            const cs=catStyle(eq.category); const isActive=eq.id===selectedId&&!bp.isMobile; const ds=equipDS(eq);
+            return (
+              <div key={eq.id} style={{ display:"flex", alignItems:"center", gap:8,
+                padding: bp.isMobile ? "10px 12px" : "10px 12px",
+                background: isActive ? "#1e293b" : "white", color: isActive ? "white" : "#334155",
+                cursor:"pointer", borderBottom: bp.isDesktop ? "1px solid #f1f5f9" : "none",
+                borderRadius: bp.isMobile ? 10 : 0, boxShadow: bp.isMobile ? "0 1px 4px rgba(0,0,0,0.07)" : "none" }}
+                onClick={() => handleSelect(eq.id)}>
+                {eq.image ? <img src={eq.image} style={{ width:36,height:36,borderRadius:5,objectFit:"cover",flexShrink:0 }} alt="" />
+                  : <div style={{ width:36,height:36,borderRadius:5,background:isActive?"#334155":"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0 }}>{eq.category==="治具"?"🔧":"⚙"}</div>}
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{eq.name}</div>
+                  <div style={{ fontSize:11,opacity:0.7 }}>{eq.location}</div>
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:2 }}>
+                  <span style={{ fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:20,background:isActive?"rgba(255,255,255,0.15)":cs.bg,color:isActive?"white":cs.color }}>{eq.category}</span>
+                  {(ds==="overdue"||ds==="soon") && <span style={{ fontSize:9,color:isActive?"#fca5a5":ds==="overdue"?"#dc2626":"#d97706",fontWeight:700 }}>{ds==="overdue"?"⚠超過":"⏰間近"}</span>}
+                </div>
+                {bp.isMobile && <span style={{ color:"#94a3b8", fontSize:16 }}>›</span>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {/* 詳細（PC/Tablet） */}
+      {!bp.isMobile && (
+        <div style={{ flex:1, minWidth:0 }}>
+          {!selected ? <div style={S.empty}>左から設備を選択してください</div>
+            : <EquipDetailEditor key={selected.id} equipment={selected} onUpdate={p => updateEquip(selected.id,p)}
+                onDelete={() => deleteEquip(selected.id,selected.name)} showNotif={showNotif} bp={bp} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EquipDetailEditor({ equipment, onUpdate, onDelete, showNotif, bp }) {
+  const [info, setInfo]           = useState({ name:equipment.name, category:equipment.category, location:equipment.location });
+  const [infoEdited, setInfoEdited] = useState(false);
+  const [items, setItems]         = useState(equipment.checkItems||[]);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm]   = useState({});
+  const [newLabel, setNewLabel]   = useState("");
+  const [newFreq, setNewFreq]     = useState("daily");
+  const imgRef = useRef();
+
+  function saveInfo() {
+    if (!info.name.trim()) { showNotif("設備名を入力してください","error"); return; }
+    onUpdate({ name:info.name, category:info.category, location:info.location });
+    setInfoEdited(false); showNotif("設備情報を更新しました");
+  }
+  function handleImage(e) {
+    const file=e.target.files[0]; if(!file) return;
+    const r=new FileReader(); r.onload=ev=>{ onUpdate({ image:ev.target.result }); showNotif("画像を設定しました"); };
+    r.readAsDataURL(file); e.target.value="";
+  }
+  function saveItems(ni) { setItems(ni); onUpdate({ checkItems:ni }); }
+  function addItem() {
+    if (!newLabel.trim()) { showNotif("項目名を入力してください","error"); return; }
+    saveItems([...items,{ id:generateId(), label:newLabel, frequency:newFreq, lastDate:null }]);
+    setNewLabel(""); showNotif("点検項目を追加しました");
+  }
+  function saveEdit(id) {
+    if (!editForm.label.trim()) { showNotif("項目名を入力してください","error"); return; }
+    saveItems(items.map(i => i.id===id ? { ...i, label:editForm.label, frequency:editForm.frequency } : i));
+    setEditingId(null); showNotif("点検項目を更新しました");
+  }
+  function deleteItem(id,label) {
+    if (!window.confirm(`「${label}」を削除しますか？`)) return;
+    saveItems(items.filter(i => i.id!==id)); showNotif("点検項目を削除しました");
+  }
+  function duplicateItem(item) {
+    const idx=items.findIndex(i => i.id===item.id);
+    const copy={ ...item, id:generateId(), label:item.label+"（複製）" };
+    saveItems([...items.slice(0,idx+1), copy, ...items.slice(idx+1)]); showNotif("複製しました");
+  }
+
+  return (
+    <div>
+      {/* 基本情報 */}
+      <div style={{ background:"white", borderRadius:12, padding: bp.isMobile ? 14 : 20, marginBottom:14, boxShadow:"0 1px 4px rgba(0,0,0,0.07)" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+          <span style={{ fontSize:15, fontWeight:700, color:"#0f172a" }}>基本情報</span>
+          <button style={{ background:"#fee2e2", color:"#dc2626", border:"1px solid #fca5a5", borderRadius:8, padding:"6px 12px", cursor:"pointer", fontSize:12, fontWeight:600 }} onClick={onDelete}>🗑 削除</button>
+        </div>
+        <div style={{ display:"flex", gap:14, flexDirection: bp.isMobile ? "column" : "row" }}>
+          {/* 画像 */}
+          <div style={{ flexShrink:0 }}>
+            <div style={{ fontSize:12, fontWeight:600, color:"#475569", marginBottom:6 }}>設備画像</div>
+            {equipment.image
+              ? <div>
+                  <img src={equipment.image} alt="" style={{ width:bp.isMobile?"100%":140, maxWidth:200, height:100, objectFit:"cover", borderRadius:8, display:"block", border:"1px solid #e2e8f0" }} />
+                  <div style={{ display:"flex", gap:6, marginTop:6 }}>
+                    <button style={{ flex:1, padding:"6px", background:"#f1f5f9", border:"1px solid #e2e8f0", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:600 }} onClick={() => imgRef.current.click()}>🖼 変更</button>
+                    <button style={{ flex:1, padding:"6px", background:"#fee2e2", color:"#dc2626", border:"1px solid #fca5a5", borderRadius:6, cursor:"pointer", fontSize:11, fontWeight:600 }} onClick={() => { if(window.confirm("画像を削除しますか？")) { onUpdate({image:null}); showNotif("削除しました"); }}}>✕ 削除</button>
+                  </div>
+                </div>
+              : <div style={{ width:bp.isMobile?"100%":140, height:100, border:"2px dashed #cbd5e1", borderRadius:8, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", cursor:"pointer", background:"#f8fafc" }} onClick={() => imgRef.current.click()}>
+                  <span style={{ fontSize:26, opacity:0.35 }}>{info.category==="治具"?"🔧":"⚙"}</span>
+                  <span style={{ fontSize:11, color:"#64748b", marginTop:4, fontWeight:600 }}>クリックして画像を設定</span>
+                </div>
+            }
+            <input ref={imgRef} type="file" accept="image/*" style={{ display:"none" }} onChange={handleImage} />
+          </div>
+          {/* テキスト */}
+          <div style={{ flex:1, display:"flex", flexDirection:"column", gap:10 }}>
+            <div>
+              <label style={{ fontSize:12, fontWeight:600, color:"#475569", display:"block", marginBottom:4 }}>設備名 *</label>
+              <input style={S.input} value={info.name} onChange={e => { setInfo({...info,name:e.target.value}); setInfoEdited(true); }} />
+            </div>
+            <div style={{ display:"flex", gap:8 }}>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:12, fontWeight:600, color:"#475569", display:"block", marginBottom:4 }}>カテゴリ</label>
+                <select style={S.input} value={info.category} onChange={e => { setInfo({...info,category:e.target.value}); setInfoEdited(true); }}>
+                  <option value="設備">設備</option><option value="治具">治具</option>
+                </select>
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:12, fontWeight:600, color:"#475569", display:"block", marginBottom:4 }}>場所</label>
+                <input style={S.input} value={info.location} onChange={e => { setInfo({...info,location:e.target.value}); setInfoEdited(true); }} />
+              </div>
+            </div>
+            {infoEdited && (
+              <div style={{ display:"flex", gap:8 }}>
+                <button style={{ ...S.saveBtn, flex:1 }} onClick={saveInfo}>保存する</button>
+                <button style={S.cancelBtnSm} onClick={() => { setInfo({ name:equipment.name, category:equipment.category, location:equipment.location }); setInfoEdited(false); }}>戻る</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 点検項目 */}
+      <div style={{ background:"white", borderRadius:12, padding: bp.isMobile ? 14 : 20, boxShadow:"0 1px 4px rgba(0,0,0,0.07)" }}>
+        <div style={{ fontSize:15, fontWeight:700, color:"#0f172a", marginBottom:12 }}>
+          点検項目 <span style={{ fontSize:13, fontWeight:400, color:"#94a3b8" }}>（{items.length}件）</span>
+        </div>
+        {/* 追加フォーム */}
+        <div style={{ display:"flex", gap:8, marginBottom:12, flexDirection: bp.isMobile ? "column" : "row" }}>
+          <input style={{ ...S.input, flex:1 }} value={newLabel} onChange={e => setNewLabel(e.target.value)}
+            placeholder="新しい点検項目を入力..." onKeyDown={e => e.key==="Enter" && addItem()} />
+          <div style={{ display:"flex", gap:8 }}>
+            <select style={{ ...S.input, flex: bp.isMobile ? 1 : "none" }} value={newFreq} onChange={e => setNewFreq(e.target.value)}>
+              {FREQUENCY_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+            </select>
+            <button style={{ ...S.addBtn, minHeight:bp.isMobile?44:"auto" }} onClick={addItem}>＋ 追加</button>
+          </div>
+        </div>
+        {/* 項目リスト */}
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {items.map((item,idx) => {
+            const nextDate=calcNextDate(item.lastDate,item.frequency); const ds=deadlineStatus(nextDate); const dStyle=DS[ds];
+            return (
+              <div key={item.id} style={{ background:"#f8fafc", borderRadius:10, padding: bp.isMobile ? "12px 12px" : "10px 14px",
+                borderLeft:`3px solid ${dStyle.color}`, display:"flex", alignItems:"flex-start", gap:8 }}>
+                <span style={{ fontSize:12, color:"#94a3b8", minWidth:20, textAlign:"right", paddingTop:2, flexShrink:0 }}>{idx+1}</span>
+                {editingId===item.id ? (
+                  <div style={{ flex:1, display:"flex", flexDirection:"column", gap:8 }}>
+                    <input style={{ ...S.inlineInput, width:"100%" }} value={editForm.label}
+                      onChange={e => setEditForm({...editForm,label:e.target.value})}
+                      onKeyDown={e => e.key==="Enter" && saveEdit(item.id)} autoFocus />
+                    <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                      <select style={{ ...S.input, flex:1 }} value={editForm.frequency} onChange={e => setEditForm({...editForm,frequency:e.target.value})}>
+                        {FREQUENCY_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+                      </select>
+                      <button style={{ ...S.saveBtn, minHeight:bp.isMobile?40:"auto" }} onClick={() => saveEdit(item.id)}>保存</button>
+                      <button style={S.cancelBtnSm} onClick={() => setEditingId(null)}>戻る</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ flex:1 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap", marginBottom:3 }}>
+                        <span style={{ fontSize: bp.isMobile ? 14 : 13, color:"#334155", fontWeight:500 }}>{item.label}</span>
+                        <span style={{ fontSize:11, fontWeight:600, padding:"2px 8px", borderRadius:20, background:"#e0e7ff", color:"#4338ca" }}>{freqLabel(item.frequency)}</span>
+                        {(ds==="overdue"||ds==="soon") && (
+                          <span style={{ fontSize:11, fontWeight:700, padding:"2px 7px", borderRadius:20, background:dStyle.bg, color:dStyle.color }}>{dStyle.icon} {dStyle.label}</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize:11, color:"#94a3b8" }}>
+                        前回: {item.lastDate||"未実施"}
+                        {nextDate && <span style={{ marginLeft:8, color:dStyle.color, fontWeight:(ds==="overdue"||ds==="soon")?700:400 }}>次回: {nextDate}</span>}
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", gap:4, flexShrink:0 }}>
+                      <button style={{ ...S.editBtn, minHeight:bp.isMobile?36:"auto", minWidth:bp.isMobile?36:"auto" }}
+                        onClick={() => { setEditingId(item.id); setEditForm({ label:item.label, frequency:item.frequency||"none" }); }}>✏</button>
+                      <button style={{ ...S.dupBtn, minHeight:bp.isMobile?36:"auto" }} onClick={() => duplicateItem(item)}>⧉</button>
+                      <button style={{ ...S.deleteBtn, minHeight:bp.isMobile?36:"auto", minWidth:bp.isMobile?36:"auto" }}
+                        onClick={() => deleteItem(item.id,item.label)}>🗑</button>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
+          {items.length===0 && <div style={S.empty}>点検項目がありません</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AlertsView({ records, bp }) {
+  const bad = records.filter(r => r.overall!=="正常");
+  return (
+    <>
+      <h3 style={S.sectionTitle}>異常・要注意 アラート</h3>
+      {bad.length===0 && <div style={S.empty}>現在、異常・要注意の記録はありません ✓</div>}
+      {bad.map(rec => {
+        const cfg=STATUS_CONFIG[rec.overall]; const badItems=rec.items.filter(i => i.status!=="正常"&&i.status!=="未点検");
+        return (
+          <div key={rec.id} style={{ borderRadius:10, padding:14, marginBottom:10, borderLeft:`4px solid ${cfg.color}`, background:cfg.bg }}>
+            <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:6, flexWrap:"wrap" }}>
+              <strong>{rec.equipment.name}</strong>
+              <span style={{ color:cfg.color, fontWeight:700 }}>{cfg.icon} {rec.overall}</span>
+              <span style={{ color:"#64748b", fontSize:12 }}>{rec.date} · {rec.inspector}</span>
+            </div>
+            {badItems.map(it => (
+              <div key={it.id} style={{ fontSize:13, color:"#334155", paddingLeft:8, marginTop:4 }}>
+                • {it.label} → <span style={{ color:STATUS_CONFIG[it.status].color, fontWeight:600 }}>{it.status}</span>
+                {it.note && <span style={{ color:"#475569" }}>: {it.note}</span>}
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 共通スタイル
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const S = {
+  sectionTitle: { fontSize:15, fontWeight:700, color:"#334155", margin:"20px 0 10px", borderBottom:"1px solid #e2e8f0", paddingBottom:6 },
+  empty: { background:"white", borderRadius:10, padding:24, textAlign:"center", color:"#94a3b8", fontSize:14 },
+  table: { width:"100%", borderCollapse:"collapse", background:"white", borderRadius:8, overflow:"hidden", boxShadow:"0 1px 3px rgba(0,0,0,0.07)" },
+  th: { background:"#f8fafc", padding:"10px 14px", fontSize:12, fontWeight:700, color:"#475569", textAlign:"left", borderBottom:"1px solid #e2e8f0" },
+  td: { padding:"10px 14px", fontSize:13, color:"#334155", borderBottom:"1px solid #f1f5f9" },
+  input: { padding:"9px 11px", border:"1px solid #cbd5e1", borderRadius:8, fontSize:13, outline:"none", background:"white", width:"100%", boxSizing:"border-box" },
+  inlineInput: { padding:"7px 10px", border:"1px solid #93c5fd", borderRadius:7, fontSize:13, outline:"none", background:"#eff6ff", boxSizing:"border-box" },
+  inputSm: { padding:"7px 10px", border:"1px solid #cbd5e1", borderRadius:7, fontSize:12, outline:"none", background:"white" },
+  addBtn: { background:"#3b82f6", color:"white", border:"none", borderRadius:8, padding:"8px 16px", cursor:"pointer", fontSize:13, fontWeight:700, whiteSpace:"nowrap" },
+  saveBtn: { background:"#16a34a", color:"white", border:"none", borderRadius:8, padding:"8px 14px", cursor:"pointer", fontSize:13, fontWeight:700 },
+  editBtn: { background:"#f1f5f9", color:"#334155", border:"1px solid #e2e8f0", borderRadius:7, padding:"5px 10px", cursor:"pointer", fontSize:13 },
+  dupBtn: { background:"#eff6ff", color:"#3b82f6", border:"1px solid #bfdbfe", borderRadius:7, padding:"5px 10px", cursor:"pointer", fontSize:12, fontWeight:700 },
+  deleteBtn: { background:"#fee2e2", color:"#dc2626", border:"1px solid #fca5a5", borderRadius:7, padding:"5px 10px", cursor:"pointer", fontSize:12 },
+  cancelBtnSm: { background:"transparent", color:"#64748b", border:"1px solid #cbd5e1", borderRadius:8, padding:"7px 12px", cursor:"pointer", fontSize:13 },
+};
+
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+  </script>
+</body>
+</html>
