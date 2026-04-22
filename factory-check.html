@@ -26,6 +26,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <!-- SheetJS (Excel出力) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <script type="text/babel">
 const { useState, useRef, useEffect } = React;
@@ -55,8 +57,10 @@ const STATUS_CONFIG = {
 };
 
 const CAT_COLORS = {
-  設備: { bg: "#dbeafe", color: "#1d4ed8" },
-  治具: { bg: "#fce7f3", color: "#be185d" },
+  設備:      { bg: "#dbeafe", color: "#1d4ed8" },
+  治具:      { bg: "#fce7f3", color: "#be185d" },
+  一般計測器: { bg: "#dcfce7", color: "#15803d" },
+  管理計測器: { bg: "#fef9c3", color: "#a16207" },
 };
 
 function catStyle(cat) { return CAT_COLORS[cat] || { bg: "#e0e7ff", color: "#4338ca" }; }
@@ -104,37 +108,37 @@ function generateId() { return Date.now().toString(36)+Math.random().toString(36
 // 初期データ
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const INIT_EQUIPMENT = [
-  { id:"eq1", name:"プレス機 #1", category:"設備", location:"A棟-1F", image:null, checkItems:[
+  { id:"eq1", name:"プレス機 #1", assetNo:"", category:"設備", location:"A棟-1F", managerMain:"", managerSub:"", spec:"", note:"", image:null, checkItems:[
     {id:"ci1a",label:"外観に異常（傷・変形・腐食）はないか",frequency:"daily",   lastDate:null},
     {id:"ci1b",label:"稼働音に異常はないか",                frequency:"daily",   lastDate:null},
     {id:"ci1c",label:"振動・発熱に異常はないか",            frequency:"weekly",  lastDate:null},
     {id:"ci1d",label:"安全カバー・ガードは正常か",          frequency:"monthly", lastDate:null},
     {id:"ci1e",label:"緊急停止ボタンは動作するか",          frequency:"monthly", lastDate:null},
   ]},
-  { id:"eq2", name:"旋盤 #3", category:"設備", location:"A棟-2F", image:null, checkItems:[
+  { id:"eq2", name:"旋盤 #3", assetNo:"", category:"設備", location:"A棟-2F", managerMain:"", managerSub:"", spec:"", note:"", image:null, checkItems:[
     {id:"ci2a",label:"外観に異常はないか",                  frequency:"daily",   lastDate:null},
     {id:"ci2b",label:"オイル・冷却水の漏れはないか",        frequency:"weekly",  lastDate:null},
     {id:"ci2c",label:"各部ボルト・ナットの緩みはないか",    frequency:"monthly", lastDate:null},
     {id:"ci2d",label:"刃物・工具の取付は正常か",            frequency:"daily",   lastDate:null},
   ]},
-  { id:"eq3", name:"溶接機 #2", category:"設備", location:"B棟-1F", image:null, checkItems:[
+  { id:"eq3", name:"溶接機 #2", assetNo:"", category:"設備", location:"B棟-1F", managerMain:"", managerSub:"", spec:"", note:"", image:null, checkItems:[
     {id:"ci3a",label:"電源ケーブルに損傷はないか",          frequency:"weekly",  lastDate:null},
     {id:"ci3b",label:"ガスホースの接続は正常か",            frequency:"daily",   lastDate:null},
     {id:"ci3c",label:"アース接続は確実か",                  frequency:"weekly",  lastDate:null},
     {id:"ci3d",label:"溶接面・保護具は揃っているか",        frequency:"monthly", lastDate:null},
   ]},
-  { id:"eq4", name:"治具 A-07", category:"治具", location:"A棟-1F", image:null, checkItems:[
+  { id:"eq4", name:"治具 A-07", assetNo:"", category:"治具", location:"A棟-1F", managerMain:"", managerSub:"", spec:"", note:"", image:null, checkItems:[
     {id:"ci4a",label:"外観に損傷（欠け・割れ・変形）はないか",frequency:"weekly",   lastDate:null},
     {id:"ci4b",label:"寸法精度は規格内か",                    frequency:"monthly",  lastDate:null},
     {id:"ci4c",label:"取付穴・ピンに摩耗はないか",            frequency:"quarterly",lastDate:null},
     {id:"ci4d",label:"刻印・識別番号は確認できるか",          frequency:"monthly",  lastDate:null},
   ]},
-  { id:"eq5", name:"治具 B-12", category:"治具", location:"B棟-2F", image:null, checkItems:[
+  { id:"eq5", name:"治具 B-12", assetNo:"", category:"治具", location:"B棟-2F", managerMain:"", managerSub:"", spec:"", note:"", image:null, checkItems:[
     {id:"ci5a",label:"外観に損傷はないか",                  frequency:"weekly",  lastDate:null},
     {id:"ci5b",label:"清掃・油分除去は完了しているか",      frequency:"daily",   lastDate:null},
     {id:"ci5c",label:"刻印・識別番号は確認できるか",        frequency:"monthly", lastDate:null},
   ]},
-  { id:"eq6", name:"コンベア #1", category:"設備", location:"C棟-1F", image:null, checkItems:[
+  { id:"eq6", name:"コンベア #1", assetNo:"", category:"設備", location:"C棟-1F", managerMain:"", managerSub:"", spec:"", note:"", image:null, checkItems:[
     {id:"ci6a",label:"ベルトに亀裂・摩耗はないか",          frequency:"weekly",  lastDate:null},
     {id:"ci6b",label:"ローラーの回転は正常か",              frequency:"weekly",  lastDate:null},
     {id:"ci6c",label:"駆動部の異音・振動はないか",          frequency:"daily",   lastDate:null},
@@ -183,12 +187,43 @@ function App() {
     setView("inspect");
   }
 
-  function submitInspection() {
+  // ── Power Automate連携設定 ──
+  // ※ このURLを変更することでPower Automateのフローを切り替えられます
+  const POWER_AUTOMATE_URL = "★ここにPower AutomateのURLを貼り付けてください★";
+
+  async function submitInspection() {
     if (!activeInspection.items.every(i => i.status!=="未点検")) { showNotif("すべての項目を点検してください","error"); return; }
     const hasAb = activeInspection.items.some(i => i.status==="異常");
     const hasWa = activeInspection.items.some(i => i.status==="要注意");
     const overall = hasAb ? "異常" : hasWa ? "要注意" : "正常";
-    setRecords(r => [{ ...activeInspection, submitted:true, overall }, ...r]);
+    const finished = { ...activeInspection, submitted:true, overall };
+
+    // ── Excelへの送信 ──
+    showNotif("Excelに記録を送信中...", "info");
+    try {
+      const payload = {
+        id:            finished.id,
+        date:          finished.date,
+        time:          finished.time,
+        equipmentName: finished.equipment.name,
+        location:      finished.equipment.location,
+        inspector:     finished.inspector,
+        overall:       overall,
+        overallNote:   finished.overallNote || "",
+      };
+      const res = await fetch(POWER_AUTOMATE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("送信失敗");
+      showNotif("Excelに記録しました ✓");
+    } catch(e) {
+      // 送信失敗してもアプリ内には保存する
+      showNotif("Excel送信に失敗しました（アプリ内には保存済み）", "error");
+    }
+
+    setRecords(r => [finished, ...r]);
     setEquipmentList(prev => prev.map(eq => {
       if (eq.id!==activeInspection.equipment.id) return eq;
       return { ...eq, checkItems: eq.checkItems.map(ci => {
@@ -196,7 +231,7 @@ function App() {
         return done ? { ...ci, lastDate:activeInspection.date } : ci;
       })};
     }));
-    setActiveInspection(null); setView("history"); showNotif("点検記録を保存しました");
+    setActiveInspection(null); setView("history");
   }
 
   const navTabs = [
@@ -341,10 +376,9 @@ function Dashboard({ records, equipment, onStart, bp }) {
       </div>
 
       <h3 style={S.sectionTitle}>設備・治具一覧</h3>
-      <div style={{ display:"grid", gridTemplateColumns: bp.isMobile ? "1fr" : bp.isTablet ? "1fr 1fr" : "1fr 1fr 1fr", gap:12 }}>
-        {equipment.map(eq => <EquipCard key={eq.id} eq={eq} records={records} today={today} onStart={onStart} bp={bp} />)}
-        {equipment.length===0 && <div style={S.empty}>設備・治具が登録されていません</div>}
-      </div>
+      {equipment.length===0 && <div style={S.empty}>設備・治具が登録されていません</div>}
+      <CategoryFolders equipment={equipment} records={records} today={today} onStart={onStart} bp={bp}
+        renderItem={(eq) => <EquipCard key={eq.id} eq={eq} records={records} today={today} onStart={onStart} bp={bp} />} />
     </div>
   );
 }
@@ -372,7 +406,7 @@ function EquipCard({ eq, records, today, onStart, bp }) {
           : <div style={{ width:"100%", height:"100%", minHeight: bp.isMobile ? 90 : 100,
               display:"flex", alignItems:"center", justifyContent:"center",
               background:"linear-gradient(135deg,#e2e8f0,#f1f5f9)", fontSize: bp.isMobile ? 32 : 36, opacity:0.45 }}>
-              {eq.category==="治具" ? "🔧" : "⚙"}
+              {eq.category==="治具" ? "🔧" : eq.category==="一般計測器"||eq.category==="管理計測器" ? "📏" : "⚙"}
             </div>
         }
         <div style={{ position:"absolute", top:6, left:6 }}>
@@ -396,6 +430,7 @@ function EquipCard({ eq, records, today, onStart, bp }) {
               background:sCfg.bg, color:sCfg.color, flexShrink:0 }}>{sCfg.icon} {status}</span>
           </div>
           <div style={{ fontSize:11, color:"#94a3b8", marginBottom:6 }}>📍 {eq.location} · {(eq.checkItems||[]).length}項目</div>
+          {eq.assetNo && <div style={{ fontSize:11, color:"#64748b", marginBottom:4 }}>🔖 管理番号：{eq.assetNo}</div>}
           {overdueItems.length > 0 && (
             <div style={{ fontSize:11, fontWeight:600, color:"#dc2626", background:"#fee2e2", padding:"3px 8px", borderRadius:6, marginBottom:4 }}>
               ⚠ {overdueItems.length}件 期限超過
@@ -423,6 +458,82 @@ function EquipCard({ eq, records, today, onStart, bp }) {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// カテゴリフォルダ（共通）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function CategoryFolders({ equipment, renderItem, bp, records, today, onStart }) {
+  const CAT_ORDER = ["設備", "治具", "一般計測器", "管理計測器"];
+  // equipment に含まれるカテゴリを順序に従って列挙（未知のカテゴリも末尾に追加）
+  const cats = [...new Set([
+    ...CAT_ORDER.filter(c => equipment.some(e => e.category===c)),
+    ...equipment.map(e => e.category).filter(c => !CAT_ORDER.includes(c))
+  ])];
+
+  // 開閉状態：初期はすべて開く
+  const initOpen = Object.fromEntries(cats.map(c => [c, true]));
+  const [open, setOpen] = useState(initOpen);
+
+  function toggle(cat) { setOpen(o => ({ ...o, [cat]: !o[cat] })); }
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+      {cats.map(cat => {
+        const items = equipment.filter(e => e.category===cat);
+        const cs    = catStyle(cat);
+        const isOpen = open[cat] !== false;
+        // カテゴリ内の期限超過・間近カウント
+        const overdueCount = items.reduce((a,eq) =>
+          a + (eq.checkItems||[]).filter(ci => deadlineStatus(calcNextDate(ci.lastDate,ci.frequency))==="overdue").length, 0);
+        const soonCount = items.reduce((a,eq) =>
+          a + (eq.checkItems||[]).filter(ci => deadlineStatus(calcNextDate(ci.lastDate,ci.frequency))==="soon").length, 0);
+        const catIcon = cat==="治具" ? "🔧" : cat==="一般計測器"||cat==="管理計測器" ? "📏" : "⚙";
+
+        return (
+          <div key={cat}>
+            {/* フォルダヘッダー */}
+            <button onClick={() => toggle(cat)} style={{
+              width:"100%", display:"flex", alignItems:"center", gap:10,
+              background: isOpen ? cs.bg : "#f8fafc",
+              border:`1px solid ${isOpen ? cs.color+"44" : "#e2e8f0"}`,
+              borderRadius: isOpen ? "10px 10px 0 0" : 10,
+              padding:"10px 14px", cursor:"pointer", textAlign:"left"
+            }}>
+              <span style={{ fontSize:16 }}>{isOpen ? "📂" : "📁"}</span>
+              <span style={{ fontSize:14, fontWeight:700, color: cs.color, flex:1 }}>
+                {catIcon} {cat}
+                <span style={{ fontSize:12, fontWeight:400, color:"#64748b", marginLeft:8 }}>{items.length}件</span>
+              </span>
+              {overdueCount > 0 && (
+                <span style={{ fontSize:11, fontWeight:700, padding:"2px 8px", borderRadius:20,
+                  background:"#fee2e2", color:"#dc2626" }}>⚠ {overdueCount}</span>
+              )}
+              {soonCount > 0 && overdueCount===0 && (
+                <span style={{ fontSize:11, fontWeight:700, padding:"2px 8px", borderRadius:20,
+                  background:"#fef3c7", color:"#d97706" }}>⏰ {soonCount}</span>
+              )}
+              <span style={{ fontSize:14, color:"#94a3b8", marginLeft:4 }}>{isOpen ? "▲" : "▼"}</span>
+            </button>
+            {/* フォルダ中身 */}
+            {isOpen && (
+              <div style={{
+                border:`1px solid ${cs.color+"44"}`, borderTop:"none",
+                borderRadius:"0 0 10px 10px", padding:12,
+                background:"#fafbfc"
+              }}>
+                <div style={{ display:"grid",
+                  gridTemplateColumns: bp.isMobile ? "1fr" : bp.isTablet ? "1fr 1fr" : "1fr 1fr 1fr",
+                  gap:10 }}>
+                  {items.map(eq => renderItem(eq))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 設備選択
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function EquipmentPicker({ equipment, onSelect, bp }) {
@@ -430,15 +541,15 @@ function EquipmentPicker({ equipment, onSelect, bp }) {
     <div>
       <h2 style={{ fontSize: bp.isMobile ? 18 : 22, fontWeight:700, margin:"0 0 16px", color:"#0f172a" }}>点検する設備を選択</h2>
       {equipment.length===0 && <div style={S.empty}>設備が登録されていません</div>}
-      <div style={{ display:"grid", gridTemplateColumns: bp.isMobile ? "1fr" : bp.isTablet ? "1fr 1fr" : "1fr 1fr 1fr", gap:12 }}>
-        {equipment.map(eq => {
+      <CategoryFolders equipment={equipment} bp={bp}
+        renderItem={(eq) => {
           const cs = catStyle(eq.category);
           const ds = equipDS(eq); const dStyle = DS[ds];
           return (
             <button key={eq.id} style={{ background:"white", borderRadius:12, overflow:"hidden",
               boxShadow:"0 2px 8px rgba(0,0,0,0.08)", borderLeft:`4px solid #3b82f6`,
               display:"flex", flexDirection: bp.isMobile ? "row" : "column",
-              cursor:"pointer", border:"none", textAlign:"left", padding:0 }}
+              cursor:"pointer", border:"none", textAlign:"left", padding:0, width:"100%" }}
               onClick={() => onSelect(eq)}>
               <div style={{ position:"relative", width: bp.isMobile ? 90 : "100%", minHeight:90,
                 flexShrink:0, background:"#f1f5f9" }}>
@@ -446,7 +557,7 @@ function EquipmentPicker({ equipment, onSelect, bp }) {
                   ? <img src={eq.image} alt={eq.name} style={{ width:"100%", height:"100%", minHeight:90, objectFit:"cover", display:"block" }} />
                   : <div style={{ width:"100%", minHeight:90, display:"flex", alignItems:"center", justifyContent:"center",
                       background:"linear-gradient(135deg,#e2e8f0,#f1f5f9)", fontSize:32, opacity:0.45 }}>
-                      {eq.category==="治具" ? "🔧" : "⚙"}
+                      {eq.category==="治具" ? "🔧" : eq.category==="一般計測器"||eq.category==="管理計測器" ? "📏" : "⚙"}
                     </div>
                 }
                 <div style={{ position:"absolute", top:6, left:6 }}>
@@ -462,13 +573,13 @@ function EquipmentPicker({ equipment, onSelect, bp }) {
               <div style={{ padding:"12px 14px", flex:1 }}>
                 <div style={{ fontSize:15, fontWeight:700, color:"#0f172a", marginBottom:3 }}>{eq.name}</div>
                 <div style={{ fontSize:11, color:"#94a3b8", marginBottom:8 }}>📍 {eq.location} · {(eq.checkItems||[]).length}項目</div>
+                {eq.assetNo && <div style={{ fontSize:11, color:"#64748b", marginBottom:8 }}>🔖 管理番号：{eq.assetNo}</div>}
                 <div style={{ background:"#3b82f6", color:"white", borderRadius:7, padding:"8px 12px",
                   fontSize:13, fontWeight:700, display:"inline-block" }}>選択して点検開始 →</div>
               </div>
             </button>
           );
-        })}
-      </div>
+        }} />
     </div>
   );
 }
@@ -502,13 +613,13 @@ function InspectView({ inspection, onChange, onSubmit, onCancel, bp }) {
         {eq.image
           ? <img src={eq.image} alt={eq.name} style={{ width:48, height:48, borderRadius:8, objectFit:"cover", flexShrink:0 }} />
           : <div style={{ width:48, height:48, borderRadius:8, background:"#e2e8f0", display:"flex", alignItems:"center", justifyContent:"center", fontSize:24, flexShrink:0 }}>
-              {eq.category==="治具" ? "🔧" : "⚙"}
+              {eq.category==="治具" ? "🔧" : eq.category==="一般計測器"||eq.category==="管理計測器" ? "📏" : "⚙"}
             </div>
         }
         <div style={{ flex:1, minWidth:0 }}>
           <h2 style={{ fontSize: bp.isMobile ? 16 : 20, fontWeight:700, margin:"0 0 2px", color:"#0f172a",
             overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{eq.name}</h2>
-          <p style={{ fontSize:11, color:"#64748b", margin:0 }}>{inspection.date} {inspection.time} · {eq.location}</p>
+          <p style={{ fontSize:11, color:"#64748b", margin:0 }}>{inspection.date} {inspection.time} · {eq.location}{eq.assetNo ? ` · 管理番号：${eq.assetNo}` : ""}{eq.managerMain ? ` · 責任者：${eq.managerMain}` : ""}</p>
         </div>
         <button style={{ background:"transparent", border:"1px solid #cbd5e1", borderRadius:8,
           padding:"7px 12px", cursor:"pointer", fontSize:12, color:"#64748b", flexShrink:0, minHeight:40 }}
@@ -652,7 +763,7 @@ function HistoryView({ records, bp }) {
           {rec.equipment.image
             ? <img src={rec.equipment.image} alt={rec.equipment.name} style={{ width:52, height:52, borderRadius:8, objectFit:"cover" }} />
             : <div style={{ width:52, height:52, borderRadius:8, background:"#e2e8f0", display:"flex", alignItems:"center", justifyContent:"center", fontSize:26 }}>
-                {rec.equipment.category==="治具" ? "🔧" : "⚙"}
+                {rec.equipment.category==="治具" ? "🔧" : rec.equipment.category==="一般計測器"||rec.equipment.category==="管理計測器" ? "📏" : "⚙"}
               </div>
           }
           <div>
@@ -722,9 +833,98 @@ function HistoryView({ records, bp }) {
       </div>
     );
   }
+  const [filterDate, setFilterDate] = useState(todayStr());
+
+  // ── Excelエクスポート ──
+  function exportExcel(targetRecords, label) {
+    if (targetRecords.length === 0) { alert("エクスポートする記録がありません"); return; }
+
+    // 1行1点検記録（異常項目は結合して1セルに）
+    const rows = targetRecords.map(rec => {
+      const abnormalItems = rec.items.filter(i => i.status==="異常" || i.status==="要注意");
+      const abnormalText  = abnormalItems.length > 0
+        ? abnormalItems.map(i => `${i.label}（${i.status}）${i.note ? "："+i.note : ""}`).join(" / ")
+        : "—";
+      return {
+        "記録ID":     rec.id,
+        "点検日":     rec.date,
+        "点検時刻":   rec.time,
+        "設備名":     rec.equipment.name,
+        "管理番号":   rec.equipment.assetNo || "—",
+        "カテゴリ":   rec.equipment.category,
+        "場所":       rec.equipment.location,
+        "担当者":     rec.inspector,
+        "総合結果":   rec.overall,
+        "点検項目数": rec.items.length,
+        "異常・要注意項目": abnormalText,
+        "コメント":   rec.overallNote || "—",
+        "取扱責任者（正）": rec.equipment.managerMain || "—",
+        "取扱責任者（副）": rec.equipment.managerSub || "—",
+        "仕様":       rec.equipment.spec || "—",
+        "備考":       rec.equipment.note || "—",
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+
+    // 列幅の設定
+    ws["!cols"] = [
+      { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 16 }, { wch: 12 },
+      { wch: 8  }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 10 },
+      { wch: 40 }, { wch: 30 }, { wch: 16 }, { wch: 16 }, { wch: 30 }, { wch: 30 },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "点検記録");
+    const wbout = XLSX.write(wb, { bookType:"xlsx", type:"base64" });
+    const uri   = "data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64," + wbout;
+    const a     = document.createElement("a");
+    a.href = uri; a.download = `点検記録_${label}.xlsx`; a.click();
+  }
+
+  const todayRecords = records.filter(r => r.date === filterDate);
+  const allRecords   = records;
+
   return (
     <div>
-      <h2 style={{ fontSize: bp.isMobile ? 18 : 22, fontWeight:700, margin:"0 0 16px", color:"#0f172a" }}>点検履歴</h2>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16, flexWrap:"wrap", gap:10 }}>
+        <h2 style={{ fontSize: bp.isMobile ? 18 : 22, fontWeight:700, margin:0, color:"#0f172a" }}>点検履歴</h2>
+      </div>
+
+      {/* ── Excelエクスポートパネル ── */}
+      <div style={{ background:"white", borderRadius:12, padding: bp.isMobile ? 14 : 16,
+        marginBottom:16, boxShadow:"0 1px 4px rgba(0,0,0,0.08)", borderTop:"3px solid #16a34a" }}>
+        <div style={{ fontSize:14, fontWeight:700, color:"#0f172a", marginBottom:12 }}>📥 Excelエクスポート</div>
+        {/* 日付指定エクスポート */}
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10, flexWrap:"wrap" }}>
+          <input type="date" value={filterDate}
+            onChange={e => setFilterDate(e.target.value)}
+            style={{ ...S.input, width:"auto", minWidth:140, fontSize: bp.isMobile ? 14 : 13 }} />
+          <button
+            style={{ background:"#16a34a", color:"white", border:"none", borderRadius:8,
+              padding: bp.isMobile ? "10px 18px" : "8px 16px", cursor:"pointer",
+              fontSize: bp.isMobile ? 14 : 13, fontWeight:700,
+              minHeight: bp.isMobile ? 44 : "auto", whiteSpace:"nowrap" }}
+            onClick={() => exportExcel(records.filter(r => r.date===filterDate), filterDate)}>
+            📥 {filterDate} の記録をExcel出力
+          </button>
+        </div>
+        {/* 全件エクスポート */}
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          <button
+            style={{ background:"#475569", color:"white", border:"none", borderRadius:8,
+              padding: bp.isMobile ? "10px 18px" : "8px 16px", cursor:"pointer",
+              fontSize: bp.isMobile ? 14 : 13, fontWeight:700,
+              minHeight: bp.isMobile ? 44 : "auto", whiteSpace:"nowrap" }}
+            onClick={() => exportExcel(allRecords, "全件")}>
+            📥 全件をExcel出力（{allRecords.length}件）
+          </button>
+        </div>
+        <div style={{ fontSize:11, color:"#94a3b8", marginTop:10 }}>
+          ※ ダウンロードしたファイルをSharePointにアップすることで事務所PCと共有できます
+        </div>
+      </div>
+
       {records.length===0 && <div style={S.empty}>点検記録がありません</div>}
       <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
         {records.map(rec => {
@@ -737,7 +937,7 @@ function HistoryView({ records, bp }) {
                 {rec.equipment.image
                   ? <img src={rec.equipment.image} alt="" style={{ width:44, height:44, borderRadius:7, objectFit:"cover", flexShrink:0 }} />
                   : <div style={{ width:44, height:44, borderRadius:7, background:"#e2e8f0", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>
-                      {rec.equipment.category==="治具" ? "🔧" : "⚙"}
+                      {rec.equipment.category==="治具" ? "🔧" : rec.equipment.category==="一般計測器"||rec.equipment.category==="管理計測器" ? "📏" : "⚙"}
                     </div>
                 }
                 <div style={{ flex:1 }}>
@@ -765,8 +965,38 @@ function HistoryView({ records, bp }) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function AdminView({ records, equipment, onEquipmentChange, showNotif, bp }) {
   const [adminTab, setAdminTab] = useState("summary");
+  const importRef = React.useRef();
   const overdueTotal = equipment.reduce((a,eq) =>
     a + (eq.checkItems||[]).filter(ci => deadlineStatus(calcNextDate(ci.lastDate,ci.frequency))==="overdue").length, 0);
+
+  // ── 設定エクスポート ──
+  function exportSettings() {
+    const data = { version:1, exportedAt: new Date().toISOString(), equipment };
+    const json = JSON.stringify(data, null, 2);
+    const uri  = "data:application/json;charset=utf-8," + encodeURIComponent(json);
+    const a    = document.createElement("a");
+    a.href = uri; a.download = `factorycheck_設定_${todayStr()}.json`; a.click();
+    showNotif("設定をエクスポートしました");
+  }
+
+  // ── 設定インポート ──
+  function importSettings(e) {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!data.equipment || !Array.isArray(data.equipment)) throw new Error("形式が不正です");
+        if (!window.confirm(`設備マスタを上書きします（${data.equipment.length}件）。よろしいですか？`)) return;
+        onEquipmentChange(data.equipment);
+        showNotif(`設定をインポートしました（${data.equipment.length}件）`);
+      } catch(err) {
+        showNotif("インポートに失敗しました：" + err.message, "error");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }
 
   const tabs = [
     { id:"summary",  label:"サマリ" },
@@ -777,7 +1007,25 @@ function AdminView({ records, equipment, onEquipmentChange, showNotif, bp }) {
 
   return (
     <div>
-      <h2 style={{ fontSize: bp.isMobile ? 18 : 22, fontWeight:700, margin:"0 0 14px", color:"#0f172a" }}>管理ダッシュボード</h2>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, flexWrap:"wrap", gap:8 }}>
+        <h2 style={{ fontSize: bp.isMobile ? 18 : 22, fontWeight:700, margin:0, color:"#0f172a" }}>管理ダッシュボード</h2>
+        {/* エクスポート・インポートボタン */}
+        <div style={{ display:"flex", gap:6 }}>
+          <button onClick={exportSettings}
+            style={{ background:"#1e3a5f", color:"white", border:"none", borderRadius:8,
+              padding: bp.isMobile ? "8px 12px" : "7px 14px", cursor:"pointer",
+              fontSize: bp.isMobile ? 12 : 12, fontWeight:700, whiteSpace:"nowrap" }}>
+            📤 設定を保存
+          </button>
+          <button onClick={() => importRef.current.click()}
+            style={{ background:"#f59e0b", color:"white", border:"none", borderRadius:8,
+              padding: bp.isMobile ? "8px 12px" : "7px 14px", cursor:"pointer",
+              fontSize: bp.isMobile ? 12 : 12, fontWeight:700, whiteSpace:"nowrap" }}>
+            📥 設定を読込
+          </button>
+          <input ref={importRef} type="file" accept=".json" style={{ display:"none" }} onChange={importSettings} />
+        </div>
+      </div>
       {/* タブ（スマホはスクロール） */}
       <div style={{ display:"flex", gap:0, marginBottom:18, borderBottom:"2px solid #e2e8f0",
         overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
@@ -817,7 +1065,7 @@ function AdminSummary({ records, equipment, bp }) {
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
                   <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                     {eq.image ? <img src={eq.image} style={{ width:32,height:32,borderRadius:5,objectFit:"cover" }} alt="" />
-                      : <span style={{ fontSize:22 }}>{eq.category==="治具"?"🔧":"⚙"}</span>}
+                      : <span style={{ fontSize:22 }}>{eq.category==="治具"?"🔧":eq.category==="一般計測器"||eq.category==="管理計測器"?"📏":"⚙"}</span>}
                     <div>
                       <div style={{ fontSize:14, fontWeight:700 }}>{eq.name}</div>
                       <span style={{ fontSize:11, fontWeight:600, padding:"1px 7px", borderRadius:20, background:cs.bg, color:cs.color }}>{eq.category}</span>
@@ -842,7 +1090,7 @@ function AdminSummary({ records, equipment, bp }) {
       <h3 style={S.sectionTitle}>設備別サマリ</h3>
       <table style={S.table}>
         <thead><tr>
-          <th style={S.th}>設備名</th><th style={S.th}>カテゴリ</th>
+          <th style={S.th}>設備名</th><th style={S.th}>管理番号</th><th style={S.th}>カテゴリ</th>
           <th style={S.th}>項目数</th><th style={S.th}>点検回数</th>
           <th style={S.th}>異常</th><th style={S.th}>最終点検</th><th style={S.th}>最終結果</th>
         </tr></thead>
@@ -852,8 +1100,9 @@ function AdminSummary({ records, equipment, bp }) {
             return (
               <tr key={eq.id}>
                 <td style={S.td}><div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                  {eq.image?<img src={eq.image} style={{ width:28,height:28,borderRadius:4,objectFit:"cover" }} alt=""/>:<span style={{ fontSize:18 }}>{eq.category==="治具"?"🔧":"⚙"}</span>}
+                  {eq.image?<img src={eq.image} style={{ width:28,height:28,borderRadius:4,objectFit:"cover" }} alt=""/>:<span style={{ fontSize:18 }}>{eq.category==="治具"?"🔧":eq.category==="一般計測器"||eq.category==="管理計測器"?"📏":"⚙"}</span>}
                   <strong>{eq.name}</strong></div></td>
+                <td style={S.td}>{eq.assetNo||<span style={{ color:"#94a3b8" }}>—</span>}</td>
                 <td style={S.td}><span style={{ fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:20,background:cs.bg,color:cs.color }}>{eq.category}</span></td>
                 <td style={{ ...S.td, textAlign:"center" }}>{eq.checkItems?.length||0}</td>
                 <td style={{ ...S.td, textAlign:"center" }}>{eq.total}</td>
@@ -947,7 +1196,7 @@ function ScheduleView({ equipment, bp }) {
                 return (
                   <tr key={idx} style={{ background:item.ds==="overdue"?"#fff5f5":item.ds==="soon"?"#fffbeb":"white" }}>
                     <td style={S.td}><div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                      {item.eqImage?<img src={item.eqImage} style={{ width:24,height:24,borderRadius:3,objectFit:"cover" }} alt=""/>:<span>{item.eqCategory==="治具"?"🔧":"⚙"}</span>}
+                      {item.eqImage?<img src={item.eqImage} style={{ width:24,height:24,borderRadius:3,objectFit:"cover" }} alt=""/>:<span>{item.eqCategory==="治具"?"🔧":item.eqCategory==="一般計測器"||item.eqCategory==="管理計測器"?"📏":"⚙"}</span>}
                       <span style={{ fontWeight:600 }}>{item.eqName}</span></div></td>
                     <td style={S.td}>{item.label}</td>
                     <td style={S.td}><span style={{ fontSize:11,padding:"2px 8px",borderRadius:20,background:"#e0e7ff",color:"#4338ca",fontWeight:600 }}>{freqLabel(item.frequency)}</span></td>
@@ -973,26 +1222,46 @@ function ScheduleView({ equipment, bp }) {
 // 設備マスタ編集
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function EquipmentMaster({ equipment, onChange, showNotif, bp }) {
+  const CAT_ORDER = ["設備", "治具", "一般計測器", "管理計測器"];
   const [selectedId, setSelectedId] = useState(equipment[0]?.id||null);
   const [showNewEq, setShowNewEq]   = useState(false);
-  const [newForm, setNewForm]       = useState({ name:"", category:"設備", location:"" });
+  const [newForm, setNewForm]       = useState({ name:"", assetNo:"", category:"設備", location:"", managerMain:"", managerSub:"", spec:"", note:"" });
   const [showDetail, setShowDetail] = useState(!bp.isMobile);
+  // フォルダ開閉（カテゴリ名 → bool）
+  const allCats = [...new Set([...CAT_ORDER.filter(c=>equipment.some(e=>e.category===c)), ...equipment.map(e=>e.category).filter(c=>!CAT_ORDER.includes(c))])];
+  const [openCats, setOpenCats] = useState(() => Object.fromEntries(allCats.map(c=>[c,true])));
+  function toggleCat(cat) { setOpenCats(o => ({...o, [cat]: !o[cat]})); }
 
   const selected = equipment.find(e => e.id===selectedId);
 
   function updateEquip(id, patch) { onChange(prev => prev.map(e => e.id===id ? { ...e, ...patch } : e)); }
   function deleteEquip(id, name) {
     if (!window.confirm(`「${name}」を削除しますか？`)) return;
+    const remaining = equipment.filter(e => e.id!==id);
     onChange(prev => prev.filter(e => e.id!==id));
-    setSelectedId(equipment.filter(e => e.id!==id)[0]?.id||null);
+    setSelectedId(remaining[0]?.id || null);
     showNotif("設備を削除しました");
+  }
+  function duplicateEquip(eq) {
+    const newEq = { ...eq, id:generateId(), name:eq.name+" (複製)",
+      checkItems:(eq.checkItems||[]).map(ci => ({ ...ci, id:generateId(), lastDate:null })) };
+    onChange(prev => {
+      // 元のアイテムの直後に挿入
+      const idx = prev.findIndex(e => e.id===eq.id);
+      const next = [...prev];
+      next.splice(idx+1, 0, newEq);
+      return next;
+    });
+    setSelectedId(newEq.id);
+    if (bp.isMobile) setShowDetail(true);
+    showNotif(`「${eq.name}」を複製しました`);
   }
   function addEquip() {
     if (!newForm.name.trim())     { showNotif("設備名を入力してください","error"); return; }
     if (!newForm.location.trim()) { showNotif("場所を入力してください","error"); return; }
     const newEq = { id:generateId(), ...newForm, image:null, checkItems:[] };
     onChange(prev => [...prev, newEq]);
-    setSelectedId(newEq.id); setShowNewEq(false); setNewForm({ name:"", category:"設備", location:"" });
+    setSelectedId(newEq.id); setShowNewEq(false); setNewForm({ name:"", assetNo:"", category:"設備", location:"" });
     if (bp.isMobile) setShowDetail(true);
     showNotif("設備を追加しました");
   }
@@ -1001,6 +1270,83 @@ function EquipmentMaster({ equipment, onChange, showNotif, bp }) {
     setSelectedId(id);
     if (bp.isMobile) setShowDetail(true);
   };
+
+  // カテゴリ別にグループ化した設備リスト
+  const cats = [...new Set([...CAT_ORDER.filter(c=>equipment.some(e=>e.category===c)), ...equipment.map(e=>e.category).filter(c=>!CAT_ORDER.includes(c))])];
+
+  function MasterList() {
+    return (
+      <div style={{ display:"flex", flexDirection:"column", gap: bp.isDesktop ? 0 : 8 }}>
+        {cats.map(cat => {
+          const items = equipment.filter(e => e.category===cat);
+          const cs    = catStyle(cat);
+          const isOpen = openCats[cat] !== false;
+          const catIcon = cat==="治具"?"🔧":cat==="一般計測器"||cat==="管理計測器"?"📏":"⚙";
+          return (
+            <div key={cat}>
+              {/* フォルダヘッダー */}
+              <div onClick={() => toggleCat(cat)} style={{
+                display:"flex", alignItems:"center", gap:8, cursor:"pointer",
+                padding: bp.isDesktop ? "8px 12px" : "8px 12px",
+                background: isOpen ? cs.bg : "#f8fafc",
+                borderBottom:"1px solid #e2e8f0",
+                borderRadius: bp.isDesktop ? 0 : (isOpen ? "8px 8px 0 0" : 8),
+                userSelect:"none"
+              }}>
+                <span style={{ fontSize:13 }}>{isOpen?"📂":"📁"}</span>
+                <span style={{ fontSize:12, fontWeight:700, color:cs.color, flex:1 }}>
+                  {catIcon} {cat}
+                  <span style={{ fontSize:11, fontWeight:400, color:"#94a3b8", marginLeft:6 }}>{items.length}</span>
+                </span>
+                <span style={{ fontSize:11, color:"#94a3b8" }}>{isOpen?"▲":"▼"}</span>
+              </div>
+              {/* フォルダ中身 */}
+              {isOpen && (
+                <div style={{
+                  background: bp.isDesktop ? "white" : "#fafbfc",
+                  border: bp.isDesktop ? "none" : `1px solid ${cs.color}44`,
+                  borderTop:"none",
+                  borderRadius: bp.isDesktop ? 0 : "0 0 8px 8px",
+                  display: bp.isMobile ? "grid" : "block",
+                  gridTemplateColumns: bp.isTablet ? "1fr 1fr" : "1fr",
+                  gap: bp.isMobile ? 6 : 0,
+                  padding: bp.isMobile ? 8 : 0,
+                }}>
+                  {items.map(eq => {
+                    const isActive=eq.id===selectedId&&!bp.isMobile; const ds=equipDS(eq);
+                    return (
+                      <div key={eq.id} style={{ display:"flex", alignItems:"center", gap:8,
+                        padding:"9px 12px",
+                        background: isActive ? "#1e293b" : "white", color: isActive ? "white" : "#334155",
+                        cursor:"pointer", borderBottom: bp.isDesktop ? "1px solid #f1f5f9" : "none",
+                        borderRadius: bp.isMobile ? 8 : 0,
+                        boxShadow: bp.isMobile ? "0 1px 3px rgba(0,0,0,0.06)" : "none" }}
+                        onClick={() => handleSelect(eq.id)}>
+                        {eq.image ? <img src={eq.image} style={{ width:34,height:34,borderRadius:5,objectFit:"cover",flexShrink:0 }} alt="" />
+                          : <div style={{ width:34,height:34,borderRadius:5,background:isActive?"#334155":"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0 }}>{catIcon}</div>}
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{eq.name}</div>
+                          <div style={{ fontSize:11,opacity:0.7 }}>{eq.assetNo ? `${eq.assetNo} · ` : ""}{eq.location}</div>
+                        </div>
+                        <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:2 }}>
+                          {(ds==="overdue"||ds==="soon") && <span style={{ fontSize:9,color:isActive?"#fca5a5":ds==="overdue"?"#dc2626":"#d97706",fontWeight:700 }}>{ds==="overdue"?"⚠超過":"⏰間近"}</span>}
+                          {/* 複製ボタン */}
+                          <span title="複製" onClick={e => { e.stopPropagation(); duplicateEquip(eq); }}
+                            style={{ fontSize:13, cursor:"pointer", opacity:0.5, padding:"2px 4px",
+                              color: isActive?"white":"#475569" }}>⧉</span>
+                        </div>
+                        {bp.isMobile && <span style={{ color:"#94a3b8", fontSize:16 }}>›</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   // スマホ：詳細表示中は設備リストを隠す
   if (bp.isMobile && showDetail && selected) {
@@ -1019,7 +1365,7 @@ function EquipmentMaster({ equipment, onChange, showNotif, bp }) {
   return (
     <div style={bp.isDesktop ? { display:"flex", gap:16, alignItems:"flex-start" } : {}}>
       {/* 設備リスト */}
-      <div style={bp.isDesktop ? { width:220, flexShrink:0, background:"white", borderRadius:10, boxShadow:"0 1px 4px rgba(0,0,0,0.08)", overflow:"hidden" } : {}}>
+      <div style={bp.isDesktop ? { width:240, flexShrink:0, background:"white", borderRadius:10, boxShadow:"0 1px 4px rgba(0,0,0,0.08)", overflow:"hidden" } : {}}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
           padding: bp.isDesktop ? "12px 14px" : "0 0 10px",
           borderBottom: bp.isDesktop ? "1px solid #e2e8f0" : "none",
@@ -1032,8 +1378,9 @@ function EquipmentMaster({ equipment, onChange, showNotif, bp }) {
         {showNewEq && (
           <div style={{ padding:12, borderBottom:"1px solid #e2e8f0", display:"flex", flexDirection:"column", gap:6, background:"#f8fafc", borderRadius: bp.isMobile ? 10 : 0, marginBottom: bp.isMobile ? 10 : 0 }}>
             <input style={S.inputSm} placeholder="設備名 *" value={newForm.name} onChange={e => setNewForm({...newForm,name:e.target.value})} />
+            <input style={S.inputSm} placeholder="管理番号" value={newForm.assetNo} onChange={e => setNewForm({...newForm,assetNo:e.target.value})} />
             <select style={S.inputSm} value={newForm.category} onChange={e => setNewForm({...newForm,category:e.target.value})}>
-              <option value="設備">設備</option><option value="治具">治具</option>
+              <option value="設備">設備</option><option value="治具">治具</option><option value="一般計測器">一般計測器</option><option value="管理計測器">管理計測器</option>
             </select>
             <input style={S.inputSm} placeholder="場所 *" value={newForm.location} onChange={e => setNewForm({...newForm,location:e.target.value})} />
             <div style={{ display:"flex", gap:6 }}>
@@ -1042,31 +1389,8 @@ function EquipmentMaster({ equipment, onChange, showNotif, bp }) {
             </div>
           </div>
         )}
-        <div style={{ display: bp.isMobile ? "grid" : "block", gridTemplateColumns: bp.isTablet ? "1fr 1fr" : "1fr",
-          gap: bp.isMobile ? 8 : 0, maxHeight: bp.isDesktop ? 520 : "none", overflowY: bp.isDesktop ? "auto" : "visible" }}>
-          {equipment.map(eq => {
-            const cs=catStyle(eq.category); const isActive=eq.id===selectedId&&!bp.isMobile; const ds=equipDS(eq);
-            return (
-              <div key={eq.id} style={{ display:"flex", alignItems:"center", gap:8,
-                padding: bp.isMobile ? "10px 12px" : "10px 12px",
-                background: isActive ? "#1e293b" : "white", color: isActive ? "white" : "#334155",
-                cursor:"pointer", borderBottom: bp.isDesktop ? "1px solid #f1f5f9" : "none",
-                borderRadius: bp.isMobile ? 10 : 0, boxShadow: bp.isMobile ? "0 1px 4px rgba(0,0,0,0.07)" : "none" }}
-                onClick={() => handleSelect(eq.id)}>
-                {eq.image ? <img src={eq.image} style={{ width:36,height:36,borderRadius:5,objectFit:"cover",flexShrink:0 }} alt="" />
-                  : <div style={{ width:36,height:36,borderRadius:5,background:isActive?"#334155":"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0 }}>{eq.category==="治具"?"🔧":"⚙"}</div>}
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{eq.name}</div>
-                  <div style={{ fontSize:11,opacity:0.7 }}>{eq.location}</div>
-                </div>
-                <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:2 }}>
-                  <span style={{ fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:20,background:isActive?"rgba(255,255,255,0.15)":cs.bg,color:isActive?"white":cs.color }}>{eq.category}</span>
-                  {(ds==="overdue"||ds==="soon") && <span style={{ fontSize:9,color:isActive?"#fca5a5":ds==="overdue"?"#dc2626":"#d97706",fontWeight:700 }}>{ds==="overdue"?"⚠超過":"⏰間近"}</span>}
-                </div>
-                {bp.isMobile && <span style={{ color:"#94a3b8", fontSize:16 }}>›</span>}
-              </div>
-            );
-          })}
+        <div style={{ maxHeight: bp.isDesktop ? 560 : "none", overflowY: bp.isDesktop ? "auto" : "visible" }}>
+          <MasterList />
         </div>
       </div>
       {/* 詳細（PC/Tablet） */}
@@ -1074,7 +1398,7 @@ function EquipmentMaster({ equipment, onChange, showNotif, bp }) {
         <div style={{ flex:1, minWidth:0 }}>
           {!selected ? <div style={S.empty}>左から設備を選択してください</div>
             : <EquipDetailEditor key={selected.id} equipment={selected} onUpdate={p => updateEquip(selected.id,p)}
-                onDelete={() => deleteEquip(selected.id,selected.name)} showNotif={showNotif} bp={bp} />}
+                onDelete={() => { deleteEquip(selected.id, selected.name); }} showNotif={showNotif} bp={bp} />}
         </div>
       )}
     </div>
@@ -1082,7 +1406,7 @@ function EquipmentMaster({ equipment, onChange, showNotif, bp }) {
 }
 
 function EquipDetailEditor({ equipment, onUpdate, onDelete, showNotif, bp }) {
-  const [info, setInfo]           = useState({ name:equipment.name, category:equipment.category, location:equipment.location });
+  const [info, setInfo]           = useState({ name:equipment.name, assetNo:equipment.assetNo||"", category:equipment.category, location:equipment.location, managerMain:equipment.managerMain||"", managerSub:equipment.managerSub||"", spec:equipment.spec||"", note:equipment.note||"" });
   const [infoEdited, setInfoEdited] = useState(false);
   const [items, setItems]         = useState(equipment.checkItems||[]);
   const [editingId, setEditingId] = useState(null);
@@ -1093,7 +1417,7 @@ function EquipDetailEditor({ equipment, onUpdate, onDelete, showNotif, bp }) {
 
   function saveInfo() {
     if (!info.name.trim()) { showNotif("設備名を入力してください","error"); return; }
-    onUpdate({ name:info.name, category:info.category, location:info.location });
+    onUpdate({ name:info.name, assetNo:info.assetNo, category:info.category, location:info.location, managerMain:info.managerMain, managerSub:info.managerSub, spec:info.spec, note:info.note });
     setInfoEdited(false); showNotif("設備情報を更新しました");
   }
   function handleImage(e) {
@@ -1143,7 +1467,7 @@ function EquipDetailEditor({ equipment, onUpdate, onDelete, showNotif, bp }) {
                   </div>
                 </div>
               : <div style={{ width:bp.isMobile?"100%":140, height:100, border:"2px dashed #cbd5e1", borderRadius:8, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", cursor:"pointer", background:"#f8fafc" }} onClick={() => imgRef.current.click()}>
-                  <span style={{ fontSize:26, opacity:0.35 }}>{info.category==="治具"?"🔧":"⚙"}</span>
+                  <span style={{ fontSize:26, opacity:0.35 }}>{info.category==="治具"?"🔧":info.category==="一般計測器"||info.category==="管理計測器"?"📏":"⚙"}</span>
                   <span style={{ fontSize:11, color:"#64748b", marginTop:4, fontWeight:600 }}>クリックして画像を設定</span>
                 </div>
             }
@@ -1155,11 +1479,15 @@ function EquipDetailEditor({ equipment, onUpdate, onDelete, showNotif, bp }) {
               <label style={{ fontSize:12, fontWeight:600, color:"#475569", display:"block", marginBottom:4 }}>設備名 *</label>
               <input style={S.input} value={info.name} onChange={e => { setInfo({...info,name:e.target.value}); setInfoEdited(true); }} />
             </div>
+            <div>
+              <label style={{ fontSize:12, fontWeight:600, color:"#475569", display:"block", marginBottom:4 }}>管理番号</label>
+              <input style={S.input} placeholder="例：EQ-001" value={info.assetNo} onChange={e => { setInfo({...info,assetNo:e.target.value}); setInfoEdited(true); }} />
+            </div>
             <div style={{ display:"flex", gap:8 }}>
               <div style={{ flex:1 }}>
                 <label style={{ fontSize:12, fontWeight:600, color:"#475569", display:"block", marginBottom:4 }}>カテゴリ</label>
                 <select style={S.input} value={info.category} onChange={e => { setInfo({...info,category:e.target.value}); setInfoEdited(true); }}>
-                  <option value="設備">設備</option><option value="治具">治具</option>
+                  <option value="設備">設備</option><option value="治具">治具</option><option value="一般計測器">一般計測器</option><option value="管理計測器">管理計測器</option>
                 </select>
               </div>
               <div style={{ flex:1 }}>
@@ -1167,10 +1495,28 @@ function EquipDetailEditor({ equipment, onUpdate, onDelete, showNotif, bp }) {
                 <input style={S.input} value={info.location} onChange={e => { setInfo({...info,location:e.target.value}); setInfoEdited(true); }} />
               </div>
             </div>
+            <div style={{ display:"flex", gap:8 }}>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:12, fontWeight:600, color:"#475569", display:"block", marginBottom:4 }}>取扱責任者（正）</label>
+                <input style={S.input} placeholder="氏名" value={info.managerMain} onChange={e => { setInfo({...info,managerMain:e.target.value}); setInfoEdited(true); }} />
+              </div>
+              <div style={{ flex:1 }}>
+                <label style={{ fontSize:12, fontWeight:600, color:"#475569", display:"block", marginBottom:4 }}>取扱責任者（副）</label>
+                <input style={S.input} placeholder="氏名" value={info.managerSub} onChange={e => { setInfo({...info,managerSub:e.target.value}); setInfoEdited(true); }} />
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize:12, fontWeight:600, color:"#475569", display:"block", marginBottom:4 }}>仕様</label>
+              <textarea style={{ ...S.input, minHeight:60, resize:"vertical" }} placeholder="型番・規格・メーカーなど" value={info.spec} onChange={e => { setInfo({...info,spec:e.target.value}); setInfoEdited(true); }} />
+            </div>
+            <div>
+              <label style={{ fontSize:12, fontWeight:600, color:"#475569", display:"block", marginBottom:4 }}>備考</label>
+              <textarea style={{ ...S.input, minHeight:60, resize:"vertical" }} placeholder="その他メモ" value={info.note} onChange={e => { setInfo({...info,note:e.target.value}); setInfoEdited(true); }} />
+            </div>
             {infoEdited && (
               <div style={{ display:"flex", gap:8 }}>
                 <button style={{ ...S.saveBtn, flex:1 }} onClick={saveInfo}>保存する</button>
-                <button style={S.cancelBtnSm} onClick={() => { setInfo({ name:equipment.name, category:equipment.category, location:equipment.location }); setInfoEdited(false); }}>戻る</button>
+                <button style={S.cancelBtnSm} onClick={() => { setInfo({ name:equipment.name, assetNo:equipment.assetNo||"", category:equipment.category, location:equipment.location, managerMain:equipment.managerMain||"", managerSub:equipment.managerSub||"", spec:equipment.spec||"", note:equipment.note||"" }); setInfoEdited(false); }}>戻る</button>
               </div>
             )}
           </div>
