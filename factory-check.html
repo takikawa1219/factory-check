@@ -236,13 +236,11 @@ function App() {
 
   const navTabs = [
     { id:"dashboard", label:"ホーム",   icon:"🏠" },
-    { id:"inspect",   label:"点検",     icon:"✅" },
     { id:"history",   label:"履歴",     icon:"📋" },
     ...(role==="admin" ? [{ id:"admin", label:"管理", icon:"⚙️" }] : []),
   ];
 
   const handleNav = (id) => {
-    if (id==="inspect" && !activeInspection) { setView("dashboard"); return; }
     setView(id);
   };
 
@@ -1001,30 +999,56 @@ function AdminView({ records, equipment, onEquipmentChange, showNotif, bp }) {
 
   // ── Excelマスタインポート ──
   const xlsxImportRef = React.useRef();
-  const [xlsxPreview, setXlsxPreview] = React.useState(null); // { rows, errors }
+  const [xlsxPreview, setXlsxPreview] = React.useState(null); // { equipList, errors }
 
-  const XLSX_COLUMNS = [
-    { key:"name",               label:"設備名",           required:true  },
-    { key:"assetNo",            label:"管理番号",          required:false },
-    { key:"category",           label:"カテゴリ",          required:false },
-    { key:"location",           label:"設置場所",          required:false },
-    { key:"managerMain",        label:"取扱責任者（正）",  required:false },
-    { key:"managerSub",         label:"取扱責任者（副）",  required:false },
-    { key:"managementCompany",  label:"管理会社",          required:false },
-    { key:"spec",               label:"仕様",              required:false },
-    { key:"note",               label:"備考",              required:false },
+  // 頻度ラベル→value の逆引き
+  const FREQ_LABEL_TO_VALUE = Object.fromEntries(FREQUENCY_OPTIONS.map(f => [f.label, f.value]));
+
+  /*
+   * Excelフォーマット（1設備＝複数行）
+   * 列A:設備名  B:管理番号  C:カテゴリ  D:設置場所  E:取扱責任者（正）  F:取扱責任者（副）
+   * G:管理会社  H:仕様  I:備考  J:点検項目  K:点検頻度
+   *
+   * 同じ設備名が複数行続く場合 → 同一設備の点検項目行として扱う
+   * 設備情報(A〜I)は最初の行のみ記載、2行目以降はJ・K列のみ記載でもOK
+   */
+  const MASTER_COLS = [
+    { key:"name",              label:"設備名",          required:true,  col:"A" },
+    { key:"assetNo",           label:"管理番号",         required:false, col:"B" },
+    { key:"category",          label:"カテゴリ",         required:false, col:"C" },
+    { key:"location",          label:"設置場所",         required:false, col:"D" },
+    { key:"managerMain",       label:"取扱責任者（正）", required:false, col:"E" },
+    { key:"managerSub",        label:"取扱責任者（副）", required:false, col:"F" },
+    { key:"managementCompany", label:"管理会社",         required:false, col:"G" },
+    { key:"spec",              label:"仕様",             required:false, col:"H" },
+    { key:"note",              label:"備考",             required:false, col:"I" },
+    { key:"checkLabel",        label:"点検項目",         required:false, col:"J" },
+    { key:"checkFreq",         label:"点検頻度",         required:false, col:"K" },
   ];
   const VALID_CATEGORIES = ["設備","治具","一般計測器","管理計測器"];
 
   function exportMasterTemplate() {
     const wb = XLSX.utils.book_new();
-    // ヘッダー行
-    const header = XLSX_COLUMNS.map(c => c.label);
-    // サンプル行
-    const sample = ["プレス機 #1","EQ-001","設備","A棟-1F","山田 太郎","鈴木 花子","○○メンテ株式会社","型番:XYZ-100","年次点検済み"];
-    const ws = XLSX.utils.aoa_to_sheet([header, sample]);
-    // 列幅設定
-    ws["!cols"] = XLSX_COLUMNS.map((c,i) => ({ wch: [14,12,12,12,16,16,22,24,20][i] }));
+    const freqOptions = FREQUENCY_OPTIONS.map(f => f.label).join(" / ");
+    const rows = [
+      // ヘッダー行
+      MASTER_COLS.map(c => c.label),
+      // サンプル：設備1行目（設備情報＋点検項目1件目）
+      ["プレス機 #1","EQ-001","設備","A棟-1F","山田 太郎","鈴木 花子","○○メンテ株式会社","型番:XYZ-100","定期点検済","外観に異常はないか","毎日"],
+      // サンプル：設備1の点検項目2件目（設備名のみ記載、他は空欄でもOK）
+      ["プレス機 #1","","","","","","","","","稼働音に異常はないか","1回/週"],
+      ["プレス機 #1","","","","","","","","","安全カバーは正常か","1回/月"],
+      // サンプル：設備2
+      ["旋盤 #3","EQ-002","設備","A棟-2F","田中 次郎","","","","","外観に異常はないか","毎日"],
+      ["旋盤 #3","","","","","","","","","オイル漏れはないか","1回/週"],
+      // 空行（区切り用）
+      [],
+      // 頻度オプション説明行
+      [`※ 点検頻度の選択肢: ${freqOptions}`],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [14,12,12,12,16,16,22,20,16,30,12].map(w => ({ wch: w }));
+    // ヘッダー行を目立たせる（背景色はSheetJSでは設定困難なので列幅のみ）
     XLSX.utils.book_append_sheet(wb, ws, "設備マスタ");
     XLSX.writeFile(wb, `設備マスタ_テンプレート.xlsx`);
     showNotif("テンプレートをダウンロードしました");
@@ -1040,38 +1064,63 @@ function AdminView({ records, equipment, onEquipmentChange, showNotif, bp }) {
         const raw = XLSX.utils.sheet_to_json(ws, { header:1, defval:"" });
         if (raw.length < 2) { showNotif("データが見つかりません","error"); return; }
 
-        // ヘッダー行でカラムマッピング
+        // ヘッダー行マッピング
         const headerRow = raw[0].map(h => String(h).trim());
         const colMap = {};
-        XLSX_COLUMNS.forEach(col => {
+        MASTER_COLS.forEach(col => {
           const idx = headerRow.indexOf(col.label);
           if (idx >= 0) colMap[col.key] = idx;
         });
 
         // 必須カラムチェック
-        const missing = XLSX_COLUMNS.filter(c => c.required && colMap[c.key] === undefined).map(c => c.label);
+        const missing = MASTER_COLS.filter(c => c.required && colMap[c.key] === undefined).map(c => c.label);
         if (missing.length > 0) { showNotif(`必須列がありません：${missing.join("、")}`, "error"); return; }
 
-        const rows = [];
         const errors = [];
+        // 設備名をキーにグループ化
+        const equipMap = new Map(); // name → equipData
+        const equipOrder = []; // 順序保持
+
         raw.slice(1).forEach((row, i) => {
           const lineNo = i + 2;
-          const name = String(row[colMap["name"]] ?? "").trim();
-          if (!name) return; // 空行スキップ
-          const category = colMap["category"] !== undefined ? String(row[colMap["category"]] ?? "").trim() : "設備";
-          const validCat = VALID_CATEGORIES.includes(category) ? category : "設備";
-          if (category && !VALID_CATEGORIES.includes(category)) {
-            errors.push(`行${lineNo}：カテゴリ「${category}」は無効のため「設備」に設定します`);
+          // 空行スキップ（設備名・点検項目ともに空）
+          const rawName = String(row[colMap["name"]] ?? "").trim();
+          const rawLabel = colMap["checkLabel"] !== undefined ? String(row[colMap["checkLabel"]] ?? "").trim() : "";
+          if (!rawName && !rawLabel) return;
+
+          // 設備名が空の行は直前の設備への点検項目行とみなす
+          const currentName = rawName || (equipOrder.length > 0 ? equipOrder[equipOrder.length-1] : "");
+          if (!currentName) return;
+
+          if (!equipMap.has(currentName)) {
+            // 新規設備
+            const category = colMap["category"] !== undefined ? String(row[colMap["category"]] ?? "").trim() : "設備";
+            const validCat = VALID_CATEGORIES.includes(category) ? category : "設備";
+            if (category && !VALID_CATEGORIES.includes(category)) {
+              errors.push(`行${lineNo}：カテゴリ「${category}」は無効のため「設備」に設定します`);
+            }
+            const equipData = { name: currentName, category: validCat, checkItems: [] };
+            MASTER_COLS.filter(c => !["name","category","checkLabel","checkFreq"].includes(c.key)).forEach(col => {
+              equipData[col.key] = colMap[col.key] !== undefined ? String(row[colMap[col.key]] ?? "").trim() : "";
+            });
+            equipMap.set(currentName, equipData);
+            equipOrder.push(currentName);
           }
-          const rowData = { name, category: validCat };
-          XLSX_COLUMNS.filter(c => c.key !== "name" && c.key !== "category").forEach(col => {
-            rowData[col.key] = colMap[col.key] !== undefined ? String(row[colMap[col.key]] ?? "").trim() : "";
-          });
-          rows.push(rowData);
+
+          // 点検項目の追加
+          if (rawLabel) {
+            const rawFreq = colMap["checkFreq"] !== undefined ? String(row[colMap["checkFreq"]] ?? "").trim() : "";
+            const freqValue = FREQ_LABEL_TO_VALUE[rawFreq] || "none";
+            if (rawFreq && !FREQ_LABEL_TO_VALUE[rawFreq]) {
+              errors.push(`行${lineNo}：頻度「${rawFreq}」は無効のため「設定なし」に設定します`);
+            }
+            equipMap.get(currentName).checkItems.push({ label: rawLabel, frequency: freqValue });
+          }
         });
 
-        if (rows.length === 0) { showNotif("有効なデータ行がありません","error"); return; }
-        setXlsxPreview({ rows, errors });
+        const equipList = equipOrder.map(name => equipMap.get(name));
+        if (equipList.length === 0) { showNotif("有効なデータ行がありません","error"); return; }
+        setXlsxPreview({ equipList, errors });
       } catch(err) {
         showNotif("Excelの読み込みに失敗しました：" + err.message, "error");
       }
@@ -1082,34 +1131,35 @@ function AdminView({ records, equipment, onEquipmentChange, showNotif, bp }) {
 
   function applyXlsxImport(mode) {
     if (!xlsxPreview) return;
-    const { rows } = xlsxPreview;
-    const newEquips = rows.map(r => ({
+    const { equipList } = xlsxPreview;
+    const newEquips = equipList.map(r => ({
       id: generateId(),
       name: r.name, assetNo: r.assetNo||"", category: r.category,
       location: r.location||"", managerMain: r.managerMain||"",
       managerSub: r.managerSub||"", managementCompany: r.managementCompany||"",
-      spec: r.spec||"", note: r.note||"", image: null, checkItems: []
+      spec: r.spec||"", note: r.note||"", image: null,
+      checkItems: r.checkItems.map(ci => ({ id: generateId(), label: ci.label, frequency: ci.frequency, lastDate: null }))
     }));
     if (mode === "replace") {
-      if (!window.confirm(`現在の全設備データを削除し、Excelの${rows.length}件で置き換えます。よろしいですか？`)) return;
+      if (!window.confirm(`現在の全設備データを削除し、Excelの${newEquips.length}件で置き換えます。よろしいですか？`)) return;
       onEquipmentChange(newEquips);
-      showNotif(`${rows.length}件の設備マスタをインポートしました（全置換）`);
+      showNotif(`${newEquips.length}件の設備マスタをインポートしました（全置換）`);
     } else {
-      // 追加モード：既存の設備名と一致するものは更新、新規は追加
       onEquipmentChange(prev => {
         const updated = [...prev];
         newEquips.forEach(ne => {
           const existIdx = updated.findIndex(e => e.name === ne.name);
           if (existIdx >= 0) {
-            // 既存を更新（checkItems・imageは保持）
-            updated[existIdx] = { ...updated[existIdx], ...ne, id: updated[existIdx].id, image: updated[existIdx].image, checkItems: updated[existIdx].checkItems };
+            // 既存更新：画像は保持、点検項目はExcelの内容で上書き（空なら保持）
+            const mergedItems = ne.checkItems.length > 0 ? ne.checkItems : updated[existIdx].checkItems;
+            updated[existIdx] = { ...updated[existIdx], ...ne, id: updated[existIdx].id, image: updated[existIdx].image, checkItems: mergedItems };
           } else {
             updated.push(ne);
           }
         });
         return updated;
       });
-      showNotif(`${rows.length}件をインポートしました（追加・更新）`);
+      showNotif(`${newEquips.length}件をインポートしました（追加・更新）`);
     }
     setXlsxPreview(null);
   }
@@ -1126,11 +1176,13 @@ function AdminView({ records, equipment, onEquipmentChange, showNotif, bp }) {
       {/* ── Excelプレビューモーダル ── */}
       {xlsxPreview && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", zIndex:2000, display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"24px 12px", overflowY:"auto" }}>
-          <div style={{ background:"white", borderRadius:14, width:"100%", maxWidth:720, boxShadow:"0 8px 40px rgba(0,0,0,0.22)" }}>
+          <div style={{ background:"white", borderRadius:14, width:"100%", maxWidth:760, boxShadow:"0 8px 40px rgba(0,0,0,0.22)" }}>
             <div style={{ padding:"18px 20px 12px", borderBottom:"1px solid #e2e8f0", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
               <div>
                 <div style={{ fontSize:16, fontWeight:700, color:"#0f172a" }}>📥 Excel取込プレビュー</div>
-                <div style={{ fontSize:12, color:"#64748b", marginTop:2 }}>{xlsxPreview.rows.length}件のデータを読み込みました。内容を確認して取込方法を選択してください。</div>
+                <div style={{ fontSize:12, color:"#64748b", marginTop:2 }}>
+                  {xlsxPreview.equipList.length}件の設備・計{xlsxPreview.equipList.reduce((a,e)=>a+e.checkItems.length,0)}件の点検項目を読み込みました。内容を確認して取込方法を選択してください。
+                </div>
               </div>
               <button onClick={() => setXlsxPreview(null)} style={{ background:"#f1f5f9", border:"none", borderRadius:7, padding:"5px 10px", cursor:"pointer", fontSize:16, color:"#64748b" }}>✕</button>
             </div>
@@ -1140,35 +1192,48 @@ function AdminView({ records, equipment, onEquipmentChange, showNotif, bp }) {
                 {xlsxPreview.errors.map((e,i) => <div key={i} style={{ fontSize:11, color:"#92400e" }}>{e}</div>)}
               </div>
             )}
-            <div style={{ maxHeight:320, overflowY:"auto", margin:"12px 20px" }}>
-              <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
-                <thead>
-                  <tr style={{ background:"#f8fafc" }}>
-                    {["設備名","管理番号","カテゴリ","設置場所","取扱責任者（正）","管理会社"].map(h => (
-                      <th key={h} style={{ padding:"7px 10px", borderBottom:"1px solid #e2e8f0", textAlign:"left", fontWeight:700, color:"#475569", whiteSpace:"nowrap" }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {xlsxPreview.rows.map((r,i) => (
-                    <tr key={i} style={{ borderBottom:"1px solid #f1f5f9" }}>
-                      <td style={{ padding:"6px 10px", color:"#0f172a", fontWeight:600 }}>{r.name}</td>
-                      <td style={{ padding:"6px 10px", color:"#475569" }}>{r.assetNo||<span style={{ color:"#cbd5e1" }}>—</span>}</td>
-                      <td style={{ padding:"6px 10px" }}><span style={{ fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:20, background:catStyle(r.category).bg, color:catStyle(r.category).color }}>{r.category}</span></td>
-                      <td style={{ padding:"6px 10px", color:"#475569" }}>{r.location||<span style={{ color:"#cbd5e1" }}>—</span>}</td>
-                      <td style={{ padding:"6px 10px", color:"#475569" }}>{r.managerMain||<span style={{ color:"#cbd5e1" }}>—</span>}</td>
-                      <td style={{ padding:"6px 10px", color:"#475569" }}>{r.managementCompany||<span style={{ color:"#cbd5e1" }}>—</span>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div style={{ maxHeight:400, overflowY:"auto", margin:"12px 20px" }}>
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {xlsxPreview.equipList.map((eq,i) => {
+                  const cs = catStyle(eq.category);
+                  return (
+                    <div key={i} style={{ border:"1px solid #e2e8f0", borderRadius:8, overflow:"hidden" }}>
+                      {/* 設備ヘッダー */}
+                      <div style={{ background:"#f8fafc", padding:"8px 12px", display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+                        <span style={{ fontSize:14, fontWeight:700, color:"#0f172a" }}>{eq.name}</span>
+                        <span style={{ fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:20, background:cs.bg, color:cs.color }}>{eq.category}</span>
+                        {eq.location && <span style={{ fontSize:11, color:"#64748b" }}>📍 {eq.location}</span>}
+                        {eq.assetNo && <span style={{ fontSize:11, color:"#64748b" }}>🔖 {eq.assetNo}</span>}
+                        {eq.managementCompany && <span style={{ fontSize:11, color:"#64748b" }}>🏢 {eq.managementCompany}</span>}
+                        {eq.managerMain && <span style={{ fontSize:11, color:"#64748b" }}>👤 {eq.managerMain}</span>}
+                        <span style={{ fontSize:11, color:"#3b82f6", fontWeight:600, marginLeft:"auto" }}>点検項目 {eq.checkItems.length}件</span>
+                      </div>
+                      {/* 点検項目リスト */}
+                      {eq.checkItems.length > 0 && (
+                        <div style={{ padding:"6px 12px 8px" }}>
+                          {eq.checkItems.map((ci,j) => (
+                            <div key={j} style={{ display:"flex", alignItems:"center", gap:8, padding:"4px 0", borderBottom: j<eq.checkItems.length-1?"1px solid #f1f5f9":"none" }}>
+                              <span style={{ fontSize:11, color:"#94a3b8", minWidth:18 }}>{j+1}.</span>
+                              <span style={{ fontSize:12, color:"#334155", flex:1 }}>{ci.label}</span>
+                              <span style={{ fontSize:10, padding:"1px 7px", borderRadius:20, background:"#e0e7ff", color:"#4338ca", fontWeight:600, whiteSpace:"nowrap" }}>{freqLabel(ci.frequency)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {eq.checkItems.length === 0 && (
+                        <div style={{ padding:"6px 12px 8px", fontSize:11, color:"#94a3b8" }}>（点検項目なし）</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
             <div style={{ padding:"12px 20px 18px", borderTop:"1px solid #e2e8f0" }}>
               <div style={{ fontSize:12, fontWeight:700, color:"#334155", marginBottom:10 }}>取込方法を選択</div>
               <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                 <button onClick={() => applyXlsxImport("merge")}
                   style={{ flex:1, minWidth:160, padding:"10px 14px", background:"#3b82f6", color:"white", border:"none", borderRadius:8, cursor:"pointer", fontSize:13, fontWeight:700 }}>
-                  ➕ 追加・更新<br/><span style={{ fontSize:10, fontWeight:400, opacity:0.85 }}>既存の設備名と一致→情報更新<br/>新規設備名→追加（点検項目・画像保持）</span>
+                  ➕ 追加・更新<br/><span style={{ fontSize:10, fontWeight:400, opacity:0.85 }}>設備名が一致→情報・点検項目を更新<br/>新規設備名→追加（画像は保持）</span>
                 </button>
                 <button onClick={() => applyXlsxImport("replace")}
                   style={{ flex:1, minWidth:160, padding:"10px 14px", background:"#dc2626", color:"white", border:"none", borderRadius:8, cursor:"pointer", fontSize:13, fontWeight:700 }}>
@@ -1237,77 +1302,104 @@ function AdminView({ records, equipment, onEquipmentChange, showNotif, bp }) {
 }
 
 function AdminSummary({ records, equipment, bp }) {
+  const CAT_ORDER = ["設備", "治具", "一般計測器", "管理計測器"];
   const byEquip = equipment.map(eq => {
     const recs = records.filter(r => r.equipment.id===eq.id);
     return { ...eq, total:recs.length, last:recs[0], abnormal:recs.filter(r => r.overall==="異常").length };
   });
-  if (bp.isMobile) {
-    return (
-      <>
-        <h3 style={S.sectionTitle}>設備別サマリ</h3>
-        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          {byEquip.map(eq => {
-            const cfg = eq.last ? STATUS_CONFIG[eq.last.overall] : STATUS_CONFIG["未点検"];
-            const cs  = catStyle(eq.category);
-            return (
-              <div key={eq.id} style={{ background:"white", borderRadius:10, padding:12, boxShadow:"0 1px 4px rgba(0,0,0,0.07)" }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                    {eq.image ? <img src={eq.image} style={{ width:32,height:32,borderRadius:5,objectFit:"cover" }} alt="" />
-                      : <span style={{ fontSize:22 }}>{eq.category==="治具"?"🔧":eq.category==="一般計測器"||eq.category==="管理計測器"?"📏":"⚙"}</span>}
-                    <div>
-                      <div style={{ fontSize:14, fontWeight:700 }}>{eq.name}</div>
-                      <span style={{ fontSize:11, fontWeight:600, padding:"1px 7px", borderRadius:20, background:cs.bg, color:cs.color }}>{eq.category}</span>
-                    </div>
-                  </div>
-                  <span style={{ fontSize:12, fontWeight:600, padding:"2px 8px", borderRadius:20, background:cfg.bg, color:cfg.color }}>{cfg.icon} {eq.last?eq.last.overall:"未点検"}</span>
-                </div>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6, fontSize:12, color:"#64748b" }}>
-                  <div style={{ textAlign:"center" }}><div style={{ fontWeight:700, fontSize:18, color:"#3b82f6" }}>{eq.checkItems?.length||0}</div>点検項目</div>
-                  <div style={{ textAlign:"center" }}><div style={{ fontWeight:700, fontSize:18, color:"#475569" }}>{eq.total}</div>点検回数</div>
-                  <div style={{ textAlign:"center" }}><div style={{ fontWeight:700, fontSize:18, color:eq.abnormal>0?"#dc2626":"#94a3b8" }}>{eq.abnormal}</div>異常件数</div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </>
-    );
-  }
+  const cats = [...new Set([...CAT_ORDER.filter(c=>byEquip.some(e=>e.category===c)), ...byEquip.map(e=>e.category).filter(c=>!CAT_ORDER.includes(c))])];
+  const [openCats, setOpenCats] = useState(() => Object.fromEntries(cats.map(c=>[c,true])));
+  function toggleCat(cat) { setOpenCats(o => ({...o, [cat]:!o[cat]})); }
+
   return (
     <>
       <h3 style={S.sectionTitle}>設備別サマリ</h3>
-      <table style={S.table}>
-        <thead><tr>
-          <th style={S.th}>設備名</th><th style={S.th}>管理番号</th><th style={S.th}>カテゴリ</th>
-          <th style={S.th}>項目数</th><th style={S.th}>点検回数</th>
-          <th style={S.th}>異常</th><th style={S.th}>最終点検</th><th style={S.th}>最終結果</th>
-        </tr></thead>
-        <tbody>
-          {byEquip.map(eq => {
-            const cfg=eq.last?STATUS_CONFIG[eq.last.overall]:STATUS_CONFIG["未点検"]; const cs=catStyle(eq.category);
-            return (
-              <tr key={eq.id}>
-                <td style={S.td}><div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                  {eq.image?<img src={eq.image} style={{ width:28,height:28,borderRadius:4,objectFit:"cover" }} alt=""/>:<span style={{ fontSize:18 }}>{eq.category==="治具"?"🔧":eq.category==="一般計測器"||eq.category==="管理計測器"?"📏":"⚙"}</span>}
-                  <strong>{eq.name}</strong></div></td>
-                <td style={S.td}>{eq.assetNo||<span style={{ color:"#94a3b8" }}>—</span>}</td>
-                <td style={S.td}><span style={{ fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:20,background:cs.bg,color:cs.color }}>{eq.category}</span></td>
-                <td style={{ ...S.td, textAlign:"center" }}>{eq.checkItems?.length||0}</td>
-                <td style={{ ...S.td, textAlign:"center" }}>{eq.total}</td>
-                <td style={{ ...S.td, textAlign:"center", color:eq.abnormal>0?"#dc2626":"#94a3b8", fontWeight:eq.abnormal>0?700:400 }}>{eq.abnormal}</td>
-                <td style={S.td}>{eq.last?`${eq.last.date} ${eq.last.time}`:"—"}</td>
-                <td style={S.td}><span style={{ fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:20,background:cfg.bg,color:cfg.color }}>{cfg.icon} {eq.last?eq.last.overall:"未点検"}</span></td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        {cats.map(cat => {
+          const items = byEquip.filter(eq => eq.category===cat);
+          const cs = catStyle(cat);
+          const isOpen = openCats[cat] !== false;
+          const catIcon = cat==="治具"?"🔧":cat==="一般計測器"||cat==="管理計測器"?"📏":"⚙";
+          const abnormalCount = items.reduce((a,eq) => a+eq.abnormal, 0);
+          return (
+            <div key={cat} style={{ borderRadius:10, overflow:"hidden", boxShadow:"0 1px 4px rgba(0,0,0,0.07)" }}>
+              <button onClick={() => toggleCat(cat)} style={{
+                width:"100%", display:"flex", alignItems:"center", gap:10,
+                background: isOpen ? cs.bg : "#f8fafc",
+                border:`1px solid ${isOpen ? cs.color+"44" : "#e2e8f0"}`,
+                borderRadius: isOpen ? "10px 10px 0 0" : 10,
+                padding:"10px 14px", cursor:"pointer", textAlign:"left"
+              }}>
+                <span style={{ fontSize:15 }}>{isOpen?"📂":"📁"}</span>
+                <span style={{ fontSize:13, fontWeight:700, color:cs.color, flex:1 }}>
+                  {catIcon} {cat}
+                  <span style={{ fontSize:11, fontWeight:400, color:"#94a3b8", marginLeft:6 }}>{items.length}件</span>
+                  {abnormalCount > 0 && <span style={{ fontSize:11, fontWeight:700, color:"#dc2626", marginLeft:8 }}>⚠ 異常{abnormalCount}件</span>}
+                </span>
+                <span style={{ fontSize:11, color:"#94a3b8" }}>{isOpen?"▲":"▼"}</span>
+              </button>
+              {isOpen && (bp.isMobile ? (
+                <div style={{ display:"flex", flexDirection:"column", gap:6, padding:8, background:"white", border:`1px solid ${cs.color}22`, borderTop:"none", borderRadius:"0 0 10px 10px" }}>
+                  {items.map(eq => {
+                    const cfg = eq.last ? STATUS_CONFIG[eq.last.overall] : STATUS_CONFIG["未点検"];
+                    return (
+                      <div key={eq.id} style={{ background:"#f8fafc", borderRadius:8, padding:12 }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                            {eq.image ? <img src={eq.image} style={{ width:32,height:32,borderRadius:5,objectFit:"cover" }} alt="" />
+                              : <span style={{ fontSize:22 }}>{catIcon}</span>}
+                            <div style={{ fontSize:14, fontWeight:700 }}>{eq.name}</div>
+                          </div>
+                          <span style={{ fontSize:12, fontWeight:600, padding:"2px 8px", borderRadius:20, background:cfg.bg, color:cfg.color }}>{cfg.icon} {eq.last?eq.last.overall:"未点検"}</span>
+                        </div>
+                        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6, fontSize:12, color:"#64748b" }}>
+                          <div style={{ textAlign:"center" }}><div style={{ fontWeight:700, fontSize:18, color:"#3b82f6" }}>{eq.checkItems?.length||0}</div>点検項目</div>
+                          <div style={{ textAlign:"center" }}><div style={{ fontWeight:700, fontSize:18, color:"#475569" }}>{eq.total}</div>点検回数</div>
+                          <div style={{ textAlign:"center" }}><div style={{ fontWeight:700, fontSize:18, color:eq.abnormal>0?"#dc2626":"#94a3b8" }}>{eq.abnormal}</div>異常件数</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ background:"white", border:`1px solid ${cs.color}22`, borderTop:"none", borderRadius:"0 0 10px 10px", overflowX:"auto" }}>
+                  <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                    <thead><tr style={{ background:"#f8fafc" }}>
+                      <th style={S.th}>設備名</th><th style={S.th}>管理番号</th>
+                      <th style={S.th}>項目数</th><th style={S.th}>点検回数</th>
+                      <th style={S.th}>異常</th><th style={S.th}>最終点検</th><th style={S.th}>最終結果</th>
+                    </tr></thead>
+                    <tbody>
+                      {items.map(eq => {
+                        const cfg = eq.last?STATUS_CONFIG[eq.last.overall]:STATUS_CONFIG["未点検"];
+                        return (
+                          <tr key={eq.id}>
+                            <td style={S.td}><div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                              {eq.image?<img src={eq.image} style={{ width:28,height:28,borderRadius:4,objectFit:"cover" }} alt=""/>:<span style={{ fontSize:18 }}>{catIcon}</span>}
+                              <strong>{eq.name}</strong></div></td>
+                            <td style={S.td}>{eq.assetNo||<span style={{ color:"#94a3b8" }}>—</span>}</td>
+                            <td style={{ ...S.td, textAlign:"center" }}>{eq.checkItems?.length||0}</td>
+                            <td style={{ ...S.td, textAlign:"center" }}>{eq.total}</td>
+                            <td style={{ ...S.td, textAlign:"center", color:eq.abnormal>0?"#dc2626":"#94a3b8", fontWeight:eq.abnormal>0?700:400 }}>{eq.abnormal}</td>
+                            <td style={S.td}>{eq.last?`${eq.last.date} ${eq.last.time}`:"—"}</td>
+                            <td style={S.td}><span style={{ fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:20,background:cfg.bg,color:cfg.color }}>{cfg.icon} {eq.last?eq.last.overall:"未点検"}</span></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
     </>
   );
 }
 
 function ScheduleView({ equipment, bp }) {
+  const CAT_ORDER = ["設備", "治具", "一般計測器", "管理計測器"];
   const [filter, setFilter] = useState("all");
   const allItems = equipment.flatMap(eq =>
     (eq.checkItems||[]).map(ci => {
@@ -1317,11 +1409,11 @@ function ScheduleView({ equipment, bp }) {
     })
   );
   const filtered = filter==="all" ? allItems : allItems.filter(i => i.ds===filter);
-  const sorted = [...filtered].sort((a,b) => {
-    const o={ overdue:0, soon:1, ok:2, none:3 };
-    return o[a.ds]!==o[b.ds] ? o[a.ds]-o[b.ds] : (a.diff??999)-(b.diff??999);
-  });
   const counts = { overdue:allItems.filter(i=>i.ds==="overdue").length, soon:allItems.filter(i=>i.ds==="soon").length, ok:allItems.filter(i=>i.ds==="ok").length, none:allItems.filter(i=>i.ds==="none").length };
+
+  const cats = [...new Set([...CAT_ORDER.filter(c=>filtered.some(i=>i.eqCategory===c)), ...filtered.map(i=>i.eqCategory).filter(c=>!CAT_ORDER.includes(c))])];
+  const [openCats, setOpenCats] = useState(() => Object.fromEntries(CAT_ORDER.map(c=>[c,true])));
+  function toggleCat(cat) { setOpenCats(o => ({...o,[cat]:!o[cat]})); }
 
   return (
     <div>
@@ -1340,69 +1432,102 @@ function ScheduleView({ equipment, bp }) {
             onClick={() => setFilter(f.key)}>{f.label}</button>
         ))}
       </div>
-      {sorted.length===0 && <div style={S.empty}>該当する点検項目がありません</div>}
-      {bp.isMobile ? (
-        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          {sorted.map((item,idx) => {
-            const dStyle = DS[item.ds];
-            return (
-              <div key={idx} style={{ background: item.ds==="overdue"?"#fff5f5":item.ds==="soon"?"#fffbeb":"white",
-                borderRadius:10, padding:12, borderLeft:`4px solid ${dStyle.color}`, boxShadow:"0 1px 3px rgba(0,0,0,0.06)" }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:5 }}>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:"#1e293b", marginBottom:2 }}>{item.eqName}</div>
-                    <div style={{ fontSize:12, color:"#475569" }}>{item.label}</div>
-                  </div>
-                  <span style={{ fontSize:11, fontWeight:700, padding:"2px 8px", borderRadius:20, flexShrink:0, marginLeft:8,
-                    background:dStyle.bg, color:dStyle.color, border:`1px solid ${dStyle.border}` }}>
-                    {dStyle.icon} {dStyle.label}
-                  </span>
+      {filtered.length===0 && <div style={S.empty}>該当する点検項目がありません</div>}
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        {cats.map(cat => {
+          const catItems = filtered.filter(i => i.eqCategory===cat).sort((a,b) => {
+            const o={overdue:0,soon:1,ok:2,none:3};
+            return o[a.ds]!==o[b.ds] ? o[a.ds]-o[b.ds] : (a.diff??999)-(b.diff??999);
+          });
+          const cs = catStyle(cat);
+          const isOpen = openCats[cat] !== false;
+          const catIcon = cat==="治具"?"🔧":cat==="一般計測器"||cat==="管理計測器"?"📏":"⚙";
+          const overdueCount = catItems.filter(i=>i.ds==="overdue").length;
+          const soonCount = catItems.filter(i=>i.ds==="soon").length;
+          return (
+            <div key={cat} style={{ borderRadius:10, overflow:"hidden", boxShadow:"0 1px 4px rgba(0,0,0,0.07)" }}>
+              <button onClick={() => toggleCat(cat)} style={{
+                width:"100%", display:"flex", alignItems:"center", gap:10,
+                background: isOpen ? cs.bg : "#f8fafc",
+                border:`1px solid ${isOpen ? cs.color+"44" : "#e2e8f0"}`,
+                borderRadius: isOpen ? "10px 10px 0 0" : 10,
+                padding:"10px 14px", cursor:"pointer", textAlign:"left"
+              }}>
+                <span style={{ fontSize:15 }}>{isOpen?"📂":"📁"}</span>
+                <span style={{ fontSize:13, fontWeight:700, color:cs.color, flex:1 }}>
+                  {catIcon} {cat}
+                  <span style={{ fontSize:11, fontWeight:400, color:"#94a3b8", marginLeft:6 }}>{catItems.length}項目</span>
+                  {overdueCount>0 && <span style={{ fontSize:11, fontWeight:700, color:"#dc2626", marginLeft:8 }}>⚠ {overdueCount}件超過</span>}
+                  {overdueCount===0 && soonCount>0 && <span style={{ fontSize:11, fontWeight:700, color:"#d97706", marginLeft:8 }}>⏰ {soonCount}件間近</span>}
+                </span>
+                <span style={{ fontSize:11, color:"#94a3b8" }}>{isOpen?"▲":"▼"}</span>
+              </button>
+              {isOpen && (bp.isMobile ? (
+                <div style={{ display:"flex", flexDirection:"column", gap:6, padding:8, background:"white", border:`1px solid ${cs.color}22`, borderTop:"none", borderRadius:"0 0 10px 10px" }}>
+                  {catItems.map((item,idx) => {
+                    const dStyle=DS[item.ds];
+                    return (
+                      <div key={idx} style={{ background:item.ds==="overdue"?"#fff5f5":item.ds==="soon"?"#fffbeb":"#f8fafc",
+                        borderRadius:8, padding:10, borderLeft:`3px solid ${dStyle.color}` }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:4 }}>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:12, fontWeight:700, color:"#1e293b", marginBottom:1 }}>{item.eqName}</div>
+                            <div style={{ fontSize:11, color:"#475569" }}>{item.label}</div>
+                          </div>
+                          <span style={{ fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:20, flexShrink:0, marginLeft:6,
+                            background:dStyle.bg, color:dStyle.color, border:`1px solid ${dStyle.border}` }}>
+                            {dStyle.icon} {dStyle.label}
+                          </span>
+                        </div>
+                        <div style={{ display:"flex", gap:6, flexWrap:"wrap", fontSize:10, color:"#64748b" }}>
+                          <span style={{ padding:"1px 7px", borderRadius:20, background:"#e0e7ff", color:"#4338ca", fontWeight:600 }}>{freqLabel(item.frequency)}</span>
+                          <span>前回: {item.lastDate||"未実施"}</span>
+                          <span style={{ color:dStyle.color, fontWeight:(item.ds==="overdue"||item.ds==="soon")?700:400 }}>
+                            次回: {item.nextDate||"—"}
+                            {item.ds==="overdue" && ` (${Math.abs(item.diff)}日超過)`}
+                            {item.ds==="soon" && ` (残り${item.diff}日)`}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div style={{ display:"flex", gap:8, flexWrap:"wrap", fontSize:11, color:"#64748b" }}>
-                  <span style={{ padding:"2px 8px", borderRadius:20, background:"#e0e7ff", color:"#4338ca", fontWeight:600 }}>{freqLabel(item.frequency)}</span>
-                  <span>前回: {item.lastDate||"未実施"}</span>
-                  <span style={{ color:dStyle.color, fontWeight:(item.ds==="overdue"||item.ds==="soon")?700:400 }}>
-                    次回: {item.nextDate||"—"}
-                    {item.ds==="overdue" && ` (${Math.abs(item.diff)}日超過)`}
-                    {item.ds==="soon" && ` (残り${item.diff}日)`}
-                  </span>
+              ) : (
+                <div style={{ background:"white", border:`1px solid ${cs.color}22`, borderTop:"none", borderRadius:"0 0 10px 10px", overflowX:"auto" }}>
+                  <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                    <thead><tr style={{ background:"#f8fafc" }}>
+                      <th style={S.th}>設備名</th><th style={S.th}>点検項目</th>
+                      <th style={S.th}>頻度</th><th style={S.th}>前回点検日</th>
+                      <th style={S.th}>次回点検日</th><th style={S.th}>状態</th>
+                    </tr></thead>
+                    <tbody>
+                      {catItems.map((item,idx) => {
+                        const dStyle=DS[item.ds];
+                        return (
+                          <tr key={idx} style={{ background:item.ds==="overdue"?"#fff5f5":item.ds==="soon"?"#fffbeb":"white" }}>
+                            <td style={S.td}><div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                              {item.eqImage?<img src={item.eqImage} style={{ width:24,height:24,borderRadius:3,objectFit:"cover" }} alt=""/>:<span>{catIcon}</span>}
+                              <span style={{ fontWeight:600 }}>{item.eqName}</span></div></td>
+                            <td style={S.td}>{item.label}</td>
+                            <td style={S.td}><span style={{ fontSize:11,padding:"2px 8px",borderRadius:20,background:"#e0e7ff",color:"#4338ca",fontWeight:600 }}>{freqLabel(item.frequency)}</span></td>
+                            <td style={S.td}>{item.lastDate||<span style={{ color:"#94a3b8" }}>未実施</span>}</td>
+                            <td style={{ ...S.td, color:dStyle.color, fontWeight:(item.ds==="overdue"||item.ds==="soon")?700:400 }}>
+                              {item.nextDate||<span style={{ color:"#94a3b8" }}>—</span>}
+                              {item.ds==="overdue" && <span style={{ fontSize:11 }}> ({Math.abs(item.diff)}日超過)</span>}
+                              {item.ds==="soon" && <span style={{ fontSize:11 }}> (残り{item.diff}日)</span>}
+                            </td>
+                            <td style={S.td}><span style={{ fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:20,background:dStyle.bg,color:dStyle.color,border:`1px solid ${dStyle.border}` }}>{dStyle.icon} {dStyle.label}</span></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div style={{ overflowX:"auto" }}>
-          <table style={S.table}>
-            <thead><tr>
-              <th style={S.th}>設備名</th><th style={S.th}>点検項目</th>
-              <th style={S.th}>頻度</th><th style={S.th}>前回点検日</th>
-              <th style={S.th}>次回点検日</th><th style={S.th}>状態</th>
-            </tr></thead>
-            <tbody>
-              {sorted.map((item,idx) => {
-                const dStyle=DS[item.ds];
-                return (
-                  <tr key={idx} style={{ background:item.ds==="overdue"?"#fff5f5":item.ds==="soon"?"#fffbeb":"white" }}>
-                    <td style={S.td}><div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                      {item.eqImage?<img src={item.eqImage} style={{ width:24,height:24,borderRadius:3,objectFit:"cover" }} alt=""/>:<span>{item.eqCategory==="治具"?"🔧":item.eqCategory==="一般計測器"||item.eqCategory==="管理計測器"?"📏":"⚙"}</span>}
-                      <span style={{ fontWeight:600 }}>{item.eqName}</span></div></td>
-                    <td style={S.td}>{item.label}</td>
-                    <td style={S.td}><span style={{ fontSize:11,padding:"2px 8px",borderRadius:20,background:"#e0e7ff",color:"#4338ca",fontWeight:600 }}>{freqLabel(item.frequency)}</span></td>
-                    <td style={S.td}>{item.lastDate||<span style={{ color:"#94a3b8" }}>未実施</span>}</td>
-                    <td style={{ ...S.td, color:dStyle.color, fontWeight:(item.ds==="overdue"||item.ds==="soon")?700:400 }}>
-                      {item.nextDate||<span style={{ color:"#94a3b8" }}>—</span>}
-                      {item.ds==="overdue" && <span style={{ fontSize:11 }}> ({Math.abs(item.diff)}日超過)</span>}
-                      {item.ds==="soon" && <span style={{ fontSize:11 }}> (残り{item.diff}日)</span>}
-                    </td>
-                    <td style={S.td}><span style={{ fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:20,background:dStyle.bg,color:dStyle.color,border:`1px solid ${dStyle.border}` }}>{dStyle.icon} {dStyle.label}</span></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+              ))}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1546,7 +1671,7 @@ function EquipmentMaster({ equipment, onChange, showNotif, bp }) {
           onClick={() => setShowDetail(false)}>← 設備一覧に戻る</button>
         <EquipDetailEditor equipment={selected} onUpdate={p => updateEquip(selected.id,p)}
           onDelete={() => { deleteEquip(selected.id,selected.name); setShowDetail(false); }}
-          showNotif={showNotif} bp={bp} />
+          showNotif={showNotif} bp={bp} allEquipment={equipment} onCopyItems={(targetId,items) => { onChange(prev => prev.map(e => e.id===targetId ? {...e, checkItems:[...e.checkItems||[], ...items.map(ci=>({...ci,id:generateId(),lastDate:null}))]} : e)); showNotif("点検項目を複写しました"); }} />
       </div>
     );
   }
@@ -1587,14 +1712,15 @@ function EquipmentMaster({ equipment, onChange, showNotif, bp }) {
         <div style={{ flex:1, minWidth:0 }}>
           {!selected ? <div style={S.empty}>左から設備を選択してください</div>
             : <EquipDetailEditor key={selected.id} equipment={selected} onUpdate={p => updateEquip(selected.id,p)}
-                onDelete={() => { deleteEquip(selected.id, selected.name); }} showNotif={showNotif} bp={bp} />}
+                onDelete={() => { deleteEquip(selected.id, selected.name); }} showNotif={showNotif} bp={bp}
+                allEquipment={equipment} onCopyItems={(targetId,items) => { onChange(prev => prev.map(e => e.id===targetId ? {...e, checkItems:[...e.checkItems||[], ...items.map(ci=>({...ci,id:generateId(),lastDate:null}))]} : e)); showNotif("点検項目を複写しました"); }} />}
         </div>
       )}
     </div>
   );
 }
 
-function EquipDetailEditor({ equipment, onUpdate, onDelete, showNotif, bp }) {
+function EquipDetailEditor({ equipment, onUpdate, onDelete, showNotif, bp, allEquipment, onCopyItems }) {
   const [info, setInfo]           = useState({ name:equipment.name, assetNo:equipment.assetNo||"", category:equipment.category, location:equipment.location, managerMain:equipment.managerMain||"", managerSub:equipment.managerSub||"", managementCompany:equipment.managementCompany||"", spec:equipment.spec||"", note:equipment.note||"" });
   const [infoEdited, setInfoEdited] = useState(false);
   const [items, setItems]         = useState(equipment.checkItems||[]);
@@ -1602,6 +1728,9 @@ function EquipDetailEditor({ equipment, onUpdate, onDelete, showNotif, bp }) {
   const [editForm, setEditForm]   = useState({});
   const [newLabel, setNewLabel]   = useState("");
   const [newFreq, setNewFreq]     = useState("daily");
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [copyTargetId, setCopyTargetId]   = useState("");
+  const [copySelected, setCopySelected]   = useState([]);
   const imgRef = useRef();
 
   function saveInfo() {
@@ -1718,9 +1847,76 @@ function EquipDetailEditor({ equipment, onUpdate, onDelete, showNotif, bp }) {
 
       {/* 点検項目 */}
       <div style={{ background:"white", borderRadius:12, padding: bp.isMobile ? 14 : 20, boxShadow:"0 1px 4px rgba(0,0,0,0.07)" }}>
-        <div style={{ fontSize:15, fontWeight:700, color:"#0f172a", marginBottom:12 }}>
-          点検項目 <span style={{ fontSize:13, fontWeight:400, color:"#94a3b8" }}>（{items.length}件）</span>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+          <div style={{ fontSize:15, fontWeight:700, color:"#0f172a" }}>
+            点検項目 <span style={{ fontSize:13, fontWeight:400, color:"#94a3b8" }}>（{items.length}件）</span>
+          </div>
+          {items.length > 0 && allEquipment && (
+            <button onClick={() => { setCopyTargetId(""); setCopySelected(items.map(i=>i.id)); setShowCopyModal(true); }}
+              style={{ background:"#eff6ff", color:"#3b82f6", border:"1px solid #bfdbfe", borderRadius:7, padding:"5px 12px", cursor:"pointer", fontSize:12, fontWeight:700 }}>
+              📋 他設備へ複写
+            </button>
+          )}
         </div>
+        {/* 複写モーダル */}
+        {showCopyModal && (
+          <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+            <div style={{ background:"white", borderRadius:14, width:"100%", maxWidth:480, boxShadow:"0 8px 40px rgba(0,0,0,0.2)", maxHeight:"80vh", display:"flex", flexDirection:"column" }}>
+              <div style={{ padding:"16px 18px 12px", borderBottom:"1px solid #e2e8f0" }}>
+                <div style={{ fontSize:15, fontWeight:700, color:"#0f172a", marginBottom:2 }}>📋 点検項目の複写</div>
+                <div style={{ fontSize:12, color:"#64748b" }}>複写する項目と複写先の設備を選択してください</div>
+              </div>
+              <div style={{ overflowY:"auto", padding:"12px 18px", flex:1 }}>
+                {/* 複写先選択 */}
+                <div style={{ marginBottom:12 }}>
+                  <label style={{ fontSize:12, fontWeight:700, color:"#475569", display:"block", marginBottom:6 }}>複写先の設備</label>
+                  <select style={{ ...S.input }} value={copyTargetId} onChange={e => setCopyTargetId(e.target.value)}>
+                    <option value="">-- 選択してください --</option>
+                    {(allEquipment||[]).filter(e => e.id!==equipment.id).map(e => (
+                      <option key={e.id} value={e.id}>{e.name}（{e.category} / {e.location}）</option>
+                    ))}
+                  </select>
+                </div>
+                {/* 複写する項目の選択 */}
+                <div>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+                    <label style={{ fontSize:12, fontWeight:700, color:"#475569" }}>複写する点検項目</label>
+                    <button onClick={() => setCopySelected(copySelected.length===items.length ? [] : items.map(i=>i.id))}
+                      style={{ fontSize:11, color:"#3b82f6", background:"none", border:"none", cursor:"pointer", fontWeight:600 }}>
+                      {copySelected.length===items.length ? "すべて解除" : "すべて選択"}
+                    </button>
+                  </div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                    {items.map(item => (
+                      <label key={item.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 10px", borderRadius:7, background: copySelected.includes(item.id)?"#eff6ff":"#f8fafc", cursor:"pointer", border:`1px solid ${copySelected.includes(item.id)?"#bfdbfe":"#e2e8f0"}` }}>
+                        <input type="checkbox" checked={copySelected.includes(item.id)}
+                          onChange={() => setCopySelected(prev => prev.includes(item.id) ? prev.filter(x=>x!==item.id) : [...prev,item.id])} />
+                        <span style={{ fontSize:13, flex:1, color:"#334155" }}>{item.label}</span>
+                        <span style={{ fontSize:10, padding:"1px 7px", borderRadius:20, background:"#e0e7ff", color:"#4338ca", fontWeight:600 }}>{freqLabel(item.frequency)}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div style={{ padding:"12px 18px 16px", borderTop:"1px solid #e2e8f0", display:"flex", gap:8 }}>
+                <button
+                  disabled={!copyTargetId || copySelected.length===0}
+                  onClick={() => {
+                    const toCopy = items.filter(i => copySelected.includes(i.id));
+                    onCopyItems(copyTargetId, toCopy);
+                    setShowCopyModal(false);
+                  }}
+                  style={{ flex:1, padding:"10px", background: (!copyTargetId||copySelected.length===0)?"#e2e8f0":"#3b82f6", color: (!copyTargetId||copySelected.length===0)?"#94a3b8":"white", border:"none", borderRadius:8, cursor: (!copyTargetId||copySelected.length===0)?"not-allowed":"pointer", fontSize:14, fontWeight:700 }}>
+                  複写する（{copySelected.length}件）
+                </button>
+                <button onClick={() => setShowCopyModal(false)}
+                  style={{ padding:"10px 16px", background:"#f1f5f9", color:"#475569", border:"1px solid #e2e8f0", borderRadius:8, cursor:"pointer", fontSize:13, fontWeight:600 }}>
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {/* 追加フォーム */}
         <div style={{ display:"flex", gap:8, marginBottom:12, flexDirection: bp.isMobile ? "column" : "row" }}>
           <input style={{ ...S.input, flex:1 }} value={newLabel} onChange={e => setNewLabel(e.target.value)}
@@ -1788,29 +1984,68 @@ function EquipDetailEditor({ equipment, onUpdate, onDelete, showNotif, bp }) {
 }
 
 function AlertsView({ records, bp }) {
+  const CAT_ORDER = ["設備", "治具", "一般計測器", "管理計測器"];
   const bad = records.filter(r => r.overall!=="正常");
+  const cats = [...new Set([...CAT_ORDER.filter(c=>bad.some(r=>r.equipment.category===c)), ...bad.map(r=>r.equipment.category).filter(c=>!CAT_ORDER.includes(c))])];
+  const [openCats, setOpenCats] = useState(() => Object.fromEntries(CAT_ORDER.map(c=>[c,true])));
+  function toggleCat(cat) { setOpenCats(o => ({...o,[cat]:!o[cat]})); }
+
   return (
     <>
       <h3 style={S.sectionTitle}>異常・要注意 アラート</h3>
       {bad.length===0 && <div style={S.empty}>現在、異常・要注意の記録はありません ✓</div>}
-      {bad.map(rec => {
-        const cfg=STATUS_CONFIG[rec.overall]; const badItems=rec.items.filter(i => i.status!=="正常"&&i.status!=="未点検");
-        return (
-          <div key={rec.id} style={{ borderRadius:10, padding:14, marginBottom:10, borderLeft:`4px solid ${cfg.color}`, background:cfg.bg }}>
-            <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:6, flexWrap:"wrap" }}>
-              <strong>{rec.equipment.name}</strong>
-              <span style={{ color:cfg.color, fontWeight:700 }}>{cfg.icon} {rec.overall}</span>
-              <span style={{ color:"#64748b", fontSize:12 }}>{rec.date} · {rec.inspector}</span>
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        {cats.map(cat => {
+          const catRecs = bad.filter(r => r.equipment.category===cat);
+          const cs = catStyle(cat);
+          const isOpen = openCats[cat] !== false;
+          const catIcon = cat==="治具"?"🔧":cat==="一般計測器"||cat==="管理計測器"?"📏":"⚙";
+          const abnCount = catRecs.filter(r=>r.overall==="異常").length;
+          const warnCount = catRecs.filter(r=>r.overall==="要注意").length;
+          return (
+            <div key={cat} style={{ borderRadius:10, overflow:"hidden", boxShadow:"0 1px 4px rgba(0,0,0,0.07)" }}>
+              <button onClick={() => toggleCat(cat)} style={{
+                width:"100%", display:"flex", alignItems:"center", gap:10,
+                background: isOpen ? cs.bg : "#f8fafc",
+                border:`1px solid ${isOpen ? cs.color+"44" : "#e2e8f0"}`,
+                borderRadius: isOpen ? "10px 10px 0 0" : 10,
+                padding:"10px 14px", cursor:"pointer", textAlign:"left"
+              }}>
+                <span style={{ fontSize:15 }}>{isOpen?"📂":"📁"}</span>
+                <span style={{ fontSize:13, fontWeight:700, color:cs.color, flex:1 }}>
+                  {catIcon} {cat}
+                  <span style={{ fontSize:11, fontWeight:400, color:"#94a3b8", marginLeft:6 }}>{catRecs.length}件</span>
+                  {abnCount>0 && <span style={{ fontSize:11, fontWeight:700, color:"#dc2626", marginLeft:8 }}>✕ 異常{abnCount}件</span>}
+                  {warnCount>0 && <span style={{ fontSize:11, fontWeight:700, color:"#d97706", marginLeft:6 }}>⚠ 要注意{warnCount}件</span>}
+                </span>
+                <span style={{ fontSize:11, color:"#94a3b8" }}>{isOpen?"▲":"▼"}</span>
+              </button>
+              {isOpen && (
+                <div style={{ background:"white", border:`1px solid ${cs.color}22`, borderTop:"none", borderRadius:"0 0 10px 10px", padding:"8px 10px", display:"flex", flexDirection:"column", gap:8 }}>
+                  {catRecs.map(rec => {
+                    const cfg=STATUS_CONFIG[rec.overall]; const badItems=rec.items.filter(i => i.status!=="正常"&&i.status!=="未点検");
+                    return (
+                      <div key={rec.id} style={{ borderRadius:8, padding:12, borderLeft:`4px solid ${cfg.color}`, background:cfg.bg }}>
+                        <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:6, flexWrap:"wrap" }}>
+                          <strong>{rec.equipment.name}</strong>
+                          <span style={{ color:cfg.color, fontWeight:700 }}>{cfg.icon} {rec.overall}</span>
+                          <span style={{ color:"#64748b", fontSize:12 }}>{rec.date} · {rec.inspector}</span>
+                        </div>
+                        {badItems.map(it => (
+                          <div key={it.id} style={{ fontSize:13, color:"#334155", paddingLeft:8, marginTop:4 }}>
+                            • {it.label} → <span style={{ color:STATUS_CONFIG[it.status].color, fontWeight:600 }}>{it.status}</span>
+                            {it.note && <span style={{ color:"#475569" }}>: {it.note}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-            {badItems.map(it => (
-              <div key={it.id} style={{ fontSize:13, color:"#334155", paddingLeft:8, marginTop:4 }}>
-                • {it.label} → <span style={{ color:STATUS_CONFIG[it.status].color, fontWeight:600 }}>{it.status}</span>
-                {it.note && <span style={{ color:"#475569" }}>: {it.note}</span>}
-              </div>
-            ))}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </>
   );
 }
