@@ -108,37 +108,37 @@ function generateId() { return Date.now().toString(36)+Math.random().toString(36
 // 初期データ
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const INIT_EQUIPMENT = [
-  { id:"eq1", name:"プレス機 #1", assetNo:"", category:"設備", location:"A棟-1F", managerMain:"", managerSub:"", spec:"", note:"", image:null, checkItems:[
+  { id:"eq1", name:"プレス機 #1", assetNo:"", category:"設備", location:"A棟-1F", managerMain:"", managerSub:"", managementCompany:"", spec:"", note:"", image:null, checkItems:[
     {id:"ci1a",label:"外観に異常（傷・変形・腐食）はないか",frequency:"daily",   lastDate:null},
     {id:"ci1b",label:"稼働音に異常はないか",                frequency:"daily",   lastDate:null},
     {id:"ci1c",label:"振動・発熱に異常はないか",            frequency:"weekly",  lastDate:null},
     {id:"ci1d",label:"安全カバー・ガードは正常か",          frequency:"monthly", lastDate:null},
     {id:"ci1e",label:"緊急停止ボタンは動作するか",          frequency:"monthly", lastDate:null},
   ]},
-  { id:"eq2", name:"旋盤 #3", assetNo:"", category:"設備", location:"A棟-2F", managerMain:"", managerSub:"", spec:"", note:"", image:null, checkItems:[
+  { id:"eq2", name:"旋盤 #3", assetNo:"", category:"設備", location:"A棟-2F", managerMain:"", managerSub:"", managementCompany:"", spec:"", note:"", image:null, checkItems:[
     {id:"ci2a",label:"外観に異常はないか",                  frequency:"daily",   lastDate:null},
     {id:"ci2b",label:"オイル・冷却水の漏れはないか",        frequency:"weekly",  lastDate:null},
     {id:"ci2c",label:"各部ボルト・ナットの緩みはないか",    frequency:"monthly", lastDate:null},
     {id:"ci2d",label:"刃物・工具の取付は正常か",            frequency:"daily",   lastDate:null},
   ]},
-  { id:"eq3", name:"溶接機 #2", assetNo:"", category:"設備", location:"B棟-1F", managerMain:"", managerSub:"", spec:"", note:"", image:null, checkItems:[
+  { id:"eq3", name:"溶接機 #2", assetNo:"", category:"設備", location:"B棟-1F", managerMain:"", managerSub:"", managementCompany:"", spec:"", note:"", image:null, checkItems:[
     {id:"ci3a",label:"電源ケーブルに損傷はないか",          frequency:"weekly",  lastDate:null},
     {id:"ci3b",label:"ガスホースの接続は正常か",            frequency:"daily",   lastDate:null},
     {id:"ci3c",label:"アース接続は確実か",                  frequency:"weekly",  lastDate:null},
     {id:"ci3d",label:"溶接面・保護具は揃っているか",        frequency:"monthly", lastDate:null},
   ]},
-  { id:"eq4", name:"治具 A-07", assetNo:"", category:"治具", location:"A棟-1F", managerMain:"", managerSub:"", spec:"", note:"", image:null, checkItems:[
+  { id:"eq4", name:"治具 A-07", assetNo:"", category:"治具", location:"A棟-1F", managerMain:"", managerSub:"", managementCompany:"", spec:"", note:"", image:null, checkItems:[
     {id:"ci4a",label:"外観に損傷（欠け・割れ・変形）はないか",frequency:"weekly",   lastDate:null},
     {id:"ci4b",label:"寸法精度は規格内か",                    frequency:"monthly",  lastDate:null},
     {id:"ci4c",label:"取付穴・ピンに摩耗はないか",            frequency:"quarterly",lastDate:null},
     {id:"ci4d",label:"刻印・識別番号は確認できるか",          frequency:"monthly",  lastDate:null},
   ]},
-  { id:"eq5", name:"治具 B-12", assetNo:"", category:"治具", location:"B棟-2F", managerMain:"", managerSub:"", spec:"", note:"", image:null, checkItems:[
+  { id:"eq5", name:"治具 B-12", assetNo:"", category:"治具", location:"B棟-2F", managerMain:"", managerSub:"", managementCompany:"", spec:"", note:"", image:null, checkItems:[
     {id:"ci5a",label:"外観に損傷はないか",                  frequency:"weekly",  lastDate:null},
     {id:"ci5b",label:"清掃・油分除去は完了しているか",      frequency:"daily",   lastDate:null},
     {id:"ci5c",label:"刻印・識別番号は確認できるか",        frequency:"monthly", lastDate:null},
   ]},
-  { id:"eq6", name:"コンベア #1", assetNo:"", category:"設備", location:"C棟-1F", managerMain:"", managerSub:"", spec:"", note:"", image:null, checkItems:[
+  { id:"eq6", name:"コンベア #1", assetNo:"", category:"設備", location:"C棟-1F", managerMain:"", managerSub:"", managementCompany:"", spec:"", note:"", image:null, checkItems:[
     {id:"ci6a",label:"ベルトに亀裂・摩耗はないか",          frequency:"weekly",  lastDate:null},
     {id:"ci6b",label:"ローラーの回転は正常か",              frequency:"weekly",  lastDate:null},
     {id:"ci6c",label:"駆動部の異音・振動はないか",          frequency:"daily",   lastDate:null},
@@ -431,6 +431,7 @@ function EquipCard({ eq, records, today, onStart, bp }) {
           </div>
           <div style={{ fontSize:11, color:"#94a3b8", marginBottom:6 }}>📍 {eq.location} · {(eq.checkItems||[]).length}項目</div>
           {eq.assetNo && <div style={{ fontSize:11, color:"#64748b", marginBottom:4 }}>🔖 管理番号：{eq.assetNo}</div>}
+          {eq.managementCompany && <div style={{ fontSize:11, color:"#64748b", marginBottom:4 }}>🏢 管理会社：{eq.managementCompany}</div>}
           {overdueItems.length > 0 && (
             <div style={{ fontSize:11, fontWeight:600, color:"#dc2626", background:"#fee2e2", padding:"3px 8px", borderRadius:6, marginBottom:4 }}>
               ⚠ {overdueItems.length}件 期限超過
@@ -998,6 +999,121 @@ function AdminView({ records, equipment, onEquipmentChange, showNotif, bp }) {
     e.target.value = "";
   }
 
+  // ── Excelマスタインポート ──
+  const xlsxImportRef = React.useRef();
+  const [xlsxPreview, setXlsxPreview] = React.useState(null); // { rows, errors }
+
+  const XLSX_COLUMNS = [
+    { key:"name",               label:"設備名",           required:true  },
+    { key:"assetNo",            label:"管理番号",          required:false },
+    { key:"category",           label:"カテゴリ",          required:false },
+    { key:"location",           label:"設置場所",          required:false },
+    { key:"managerMain",        label:"取扱責任者（正）",  required:false },
+    { key:"managerSub",         label:"取扱責任者（副）",  required:false },
+    { key:"managementCompany",  label:"管理会社",          required:false },
+    { key:"spec",               label:"仕様",              required:false },
+    { key:"note",               label:"備考",              required:false },
+  ];
+  const VALID_CATEGORIES = ["設備","治具","一般計測器","管理計測器"];
+
+  function exportMasterTemplate() {
+    const wb = XLSX.utils.book_new();
+    // ヘッダー行
+    const header = XLSX_COLUMNS.map(c => c.label);
+    // サンプル行
+    const sample = ["プレス機 #1","EQ-001","設備","A棟-1F","山田 太郎","鈴木 花子","○○メンテ株式会社","型番:XYZ-100","年次点検済み"];
+    const ws = XLSX.utils.aoa_to_sheet([header, sample]);
+    // 列幅設定
+    ws["!cols"] = XLSX_COLUMNS.map((c,i) => ({ wch: [14,12,12,12,16,16,22,24,20][i] }));
+    XLSX.utils.book_append_sheet(wb, ws, "設備マスタ");
+    XLSX.writeFile(wb, `設備マスタ_テンプレート.xlsx`);
+    showNotif("テンプレートをダウンロードしました");
+  }
+
+  function handleXlsxImport(e) {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const wb = XLSX.read(ev.target.result, { type:"array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json(ws, { header:1, defval:"" });
+        if (raw.length < 2) { showNotif("データが見つかりません","error"); return; }
+
+        // ヘッダー行でカラムマッピング
+        const headerRow = raw[0].map(h => String(h).trim());
+        const colMap = {};
+        XLSX_COLUMNS.forEach(col => {
+          const idx = headerRow.indexOf(col.label);
+          if (idx >= 0) colMap[col.key] = idx;
+        });
+
+        // 必須カラムチェック
+        const missing = XLSX_COLUMNS.filter(c => c.required && colMap[c.key] === undefined).map(c => c.label);
+        if (missing.length > 0) { showNotif(`必須列がありません：${missing.join("、")}`, "error"); return; }
+
+        const rows = [];
+        const errors = [];
+        raw.slice(1).forEach((row, i) => {
+          const lineNo = i + 2;
+          const name = String(row[colMap["name"]] ?? "").trim();
+          if (!name) return; // 空行スキップ
+          const category = colMap["category"] !== undefined ? String(row[colMap["category"]] ?? "").trim() : "設備";
+          const validCat = VALID_CATEGORIES.includes(category) ? category : "設備";
+          if (category && !VALID_CATEGORIES.includes(category)) {
+            errors.push(`行${lineNo}：カテゴリ「${category}」は無効のため「設備」に設定します`);
+          }
+          const rowData = { name, category: validCat };
+          XLSX_COLUMNS.filter(c => c.key !== "name" && c.key !== "category").forEach(col => {
+            rowData[col.key] = colMap[col.key] !== undefined ? String(row[colMap[col.key]] ?? "").trim() : "";
+          });
+          rows.push(rowData);
+        });
+
+        if (rows.length === 0) { showNotif("有効なデータ行がありません","error"); return; }
+        setXlsxPreview({ rows, errors });
+      } catch(err) {
+        showNotif("Excelの読み込みに失敗しました：" + err.message, "error");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = "";
+  }
+
+  function applyXlsxImport(mode) {
+    if (!xlsxPreview) return;
+    const { rows } = xlsxPreview;
+    const newEquips = rows.map(r => ({
+      id: generateId(),
+      name: r.name, assetNo: r.assetNo||"", category: r.category,
+      location: r.location||"", managerMain: r.managerMain||"",
+      managerSub: r.managerSub||"", managementCompany: r.managementCompany||"",
+      spec: r.spec||"", note: r.note||"", image: null, checkItems: []
+    }));
+    if (mode === "replace") {
+      if (!window.confirm(`現在の全設備データを削除し、Excelの${rows.length}件で置き換えます。よろしいですか？`)) return;
+      onEquipmentChange(newEquips);
+      showNotif(`${rows.length}件の設備マスタをインポートしました（全置換）`);
+    } else {
+      // 追加モード：既存の設備名と一致するものは更新、新規は追加
+      onEquipmentChange(prev => {
+        const updated = [...prev];
+        newEquips.forEach(ne => {
+          const existIdx = updated.findIndex(e => e.name === ne.name);
+          if (existIdx >= 0) {
+            // 既存を更新（checkItems・imageは保持）
+            updated[existIdx] = { ...updated[existIdx], ...ne, id: updated[existIdx].id, image: updated[existIdx].image, checkItems: updated[existIdx].checkItems };
+          } else {
+            updated.push(ne);
+          }
+        });
+        return updated;
+      });
+      showNotif(`${rows.length}件をインポートしました（追加・更新）`);
+    }
+    setXlsxPreview(null);
+  }
+
   const tabs = [
     { id:"summary",  label:"サマリ" },
     { id:"master",   label:"設備マスタ" },
@@ -1007,6 +1123,66 @@ function AdminView({ records, equipment, onEquipmentChange, showNotif, bp }) {
 
   return (
     <div>
+      {/* ── Excelプレビューモーダル ── */}
+      {xlsxPreview && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", zIndex:2000, display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"24px 12px", overflowY:"auto" }}>
+          <div style={{ background:"white", borderRadius:14, width:"100%", maxWidth:720, boxShadow:"0 8px 40px rgba(0,0,0,0.22)" }}>
+            <div style={{ padding:"18px 20px 12px", borderBottom:"1px solid #e2e8f0", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <div>
+                <div style={{ fontSize:16, fontWeight:700, color:"#0f172a" }}>📥 Excel取込プレビュー</div>
+                <div style={{ fontSize:12, color:"#64748b", marginTop:2 }}>{xlsxPreview.rows.length}件のデータを読み込みました。内容を確認して取込方法を選択してください。</div>
+              </div>
+              <button onClick={() => setXlsxPreview(null)} style={{ background:"#f1f5f9", border:"none", borderRadius:7, padding:"5px 10px", cursor:"pointer", fontSize:16, color:"#64748b" }}>✕</button>
+            </div>
+            {xlsxPreview.errors.length > 0 && (
+              <div style={{ margin:"12px 20px 0", padding:"10px 14px", background:"#fef3c7", borderRadius:8, border:"1px solid #fcd34d" }}>
+                <div style={{ fontSize:12, fontWeight:700, color:"#92400e", marginBottom:4 }}>⚠ 注意事項</div>
+                {xlsxPreview.errors.map((e,i) => <div key={i} style={{ fontSize:11, color:"#92400e" }}>{e}</div>)}
+              </div>
+            )}
+            <div style={{ maxHeight:320, overflowY:"auto", margin:"12px 20px" }}>
+              <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
+                <thead>
+                  <tr style={{ background:"#f8fafc" }}>
+                    {["設備名","管理番号","カテゴリ","設置場所","取扱責任者（正）","管理会社"].map(h => (
+                      <th key={h} style={{ padding:"7px 10px", borderBottom:"1px solid #e2e8f0", textAlign:"left", fontWeight:700, color:"#475569", whiteSpace:"nowrap" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {xlsxPreview.rows.map((r,i) => (
+                    <tr key={i} style={{ borderBottom:"1px solid #f1f5f9" }}>
+                      <td style={{ padding:"6px 10px", color:"#0f172a", fontWeight:600 }}>{r.name}</td>
+                      <td style={{ padding:"6px 10px", color:"#475569" }}>{r.assetNo||<span style={{ color:"#cbd5e1" }}>—</span>}</td>
+                      <td style={{ padding:"6px 10px" }}><span style={{ fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:20, background:catStyle(r.category).bg, color:catStyle(r.category).color }}>{r.category}</span></td>
+                      <td style={{ padding:"6px 10px", color:"#475569" }}>{r.location||<span style={{ color:"#cbd5e1" }}>—</span>}</td>
+                      <td style={{ padding:"6px 10px", color:"#475569" }}>{r.managerMain||<span style={{ color:"#cbd5e1" }}>—</span>}</td>
+                      <td style={{ padding:"6px 10px", color:"#475569" }}>{r.managementCompany||<span style={{ color:"#cbd5e1" }}>—</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ padding:"12px 20px 18px", borderTop:"1px solid #e2e8f0" }}>
+              <div style={{ fontSize:12, fontWeight:700, color:"#334155", marginBottom:10 }}>取込方法を選択</div>
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                <button onClick={() => applyXlsxImport("merge")}
+                  style={{ flex:1, minWidth:160, padding:"10px 14px", background:"#3b82f6", color:"white", border:"none", borderRadius:8, cursor:"pointer", fontSize:13, fontWeight:700 }}>
+                  ➕ 追加・更新<br/><span style={{ fontSize:10, fontWeight:400, opacity:0.85 }}>既存の設備名と一致→情報更新<br/>新規設備名→追加（点検項目・画像保持）</span>
+                </button>
+                <button onClick={() => applyXlsxImport("replace")}
+                  style={{ flex:1, minWidth:160, padding:"10px 14px", background:"#dc2626", color:"white", border:"none", borderRadius:8, cursor:"pointer", fontSize:13, fontWeight:700 }}>
+                  🔄 全置換<br/><span style={{ fontSize:10, fontWeight:400, opacity:0.85 }}>現在の全データを削除して<br/>Excelの内容で置き換え</span>
+                </button>
+                <button onClick={() => setXlsxPreview(null)}
+                  style={{ padding:"10px 18px", background:"#f1f5f9", color:"#475569", border:"1px solid #e2e8f0", borderRadius:8, cursor:"pointer", fontSize:13, fontWeight:600 }}>
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14, flexWrap:"wrap", gap:8 }}>
         <h2 style={{ fontSize: bp.isMobile ? 18 : 22, fontWeight:700, margin:0, color:"#0f172a" }}>管理ダッシュボード</h2>
         {/* エクスポート・インポートボタン */}
@@ -1023,7 +1199,20 @@ function AdminView({ records, equipment, onEquipmentChange, showNotif, bp }) {
               fontSize: bp.isMobile ? 12 : 12, fontWeight:700, whiteSpace:"nowrap" }}>
             📥 設定を読込
           </button>
+          <button onClick={exportMasterTemplate}
+            style={{ background:"#059669", color:"white", border:"none", borderRadius:8,
+              padding: bp.isMobile ? "8px 12px" : "7px 14px", cursor:"pointer",
+              fontSize: bp.isMobile ? 12 : 12, fontWeight:700, whiteSpace:"nowrap" }}>
+            📋 Excel台帳
+          </button>
+          <button onClick={() => xlsxImportRef.current.click()}
+            style={{ background:"#7c3aed", color:"white", border:"none", borderRadius:8,
+              padding: bp.isMobile ? "8px 12px" : "7px 14px", cursor:"pointer",
+              fontSize: bp.isMobile ? 12 : 12, fontWeight:700, whiteSpace:"nowrap" }}>
+            📥 Excel取込
+          </button>
           <input ref={importRef} type="file" accept=".json" style={{ display:"none" }} onChange={importSettings} />
+          <input ref={xlsxImportRef} type="file" accept=".xlsx,.xls" style={{ display:"none" }} onChange={handleXlsxImport} />
         </div>
       </div>
       {/* タブ（スマホはスクロール） */}
@@ -1225,7 +1414,7 @@ function EquipmentMaster({ equipment, onChange, showNotif, bp }) {
   const CAT_ORDER = ["設備", "治具", "一般計測器", "管理計測器"];
   const [selectedId, setSelectedId] = useState(equipment[0]?.id||null);
   const [showNewEq, setShowNewEq]   = useState(false);
-  const [newForm, setNewForm]       = useState({ name:"", assetNo:"", category:"設備", location:"", managerMain:"", managerSub:"", spec:"", note:"" });
+  const [newForm, setNewForm]       = useState({ name:"", assetNo:"", category:"設備", location:"", managerMain:"", managerSub:"", managementCompany:"", spec:"", note:"" });
   const [showDetail, setShowDetail] = useState(!bp.isMobile);
   // フォルダ開閉（カテゴリ名 → bool）
   const allCats = [...new Set([...CAT_ORDER.filter(c=>equipment.some(e=>e.category===c)), ...equipment.map(e=>e.category).filter(c=>!CAT_ORDER.includes(c))])];
@@ -1261,7 +1450,7 @@ function EquipmentMaster({ equipment, onChange, showNotif, bp }) {
     if (!newForm.location.trim()) { showNotif("場所を入力してください","error"); return; }
     const newEq = { id:generateId(), ...newForm, image:null, checkItems:[] };
     onChange(prev => [...prev, newEq]);
-    setSelectedId(newEq.id); setShowNewEq(false); setNewForm({ name:"", assetNo:"", category:"設備", location:"" });
+    setSelectedId(newEq.id); setShowNewEq(false); setNewForm({ name:"", assetNo:"", category:"設備", location:"", managerMain:"", managerSub:"", managementCompany:"", spec:"", note:"" });
     if (bp.isMobile) setShowDetail(true);
     showNotif("設備を追加しました");
   }
@@ -1406,7 +1595,7 @@ function EquipmentMaster({ equipment, onChange, showNotif, bp }) {
 }
 
 function EquipDetailEditor({ equipment, onUpdate, onDelete, showNotif, bp }) {
-  const [info, setInfo]           = useState({ name:equipment.name, assetNo:equipment.assetNo||"", category:equipment.category, location:equipment.location, managerMain:equipment.managerMain||"", managerSub:equipment.managerSub||"", spec:equipment.spec||"", note:equipment.note||"" });
+  const [info, setInfo]           = useState({ name:equipment.name, assetNo:equipment.assetNo||"", category:equipment.category, location:equipment.location, managerMain:equipment.managerMain||"", managerSub:equipment.managerSub||"", managementCompany:equipment.managementCompany||"", spec:equipment.spec||"", note:equipment.note||"" });
   const [infoEdited, setInfoEdited] = useState(false);
   const [items, setItems]         = useState(equipment.checkItems||[]);
   const [editingId, setEditingId] = useState(null);
@@ -1417,7 +1606,7 @@ function EquipDetailEditor({ equipment, onUpdate, onDelete, showNotif, bp }) {
 
   function saveInfo() {
     if (!info.name.trim()) { showNotif("設備名を入力してください","error"); return; }
-    onUpdate({ name:info.name, assetNo:info.assetNo, category:info.category, location:info.location, managerMain:info.managerMain, managerSub:info.managerSub, spec:info.spec, note:info.note });
+    onUpdate({ name:info.name, assetNo:info.assetNo, category:info.category, location:info.location, managerMain:info.managerMain, managerSub:info.managerSub, managementCompany:info.managementCompany, spec:info.spec, note:info.note });
     setInfoEdited(false); showNotif("設備情報を更新しました");
   }
   function handleImage(e) {
@@ -1506,6 +1695,10 @@ function EquipDetailEditor({ equipment, onUpdate, onDelete, showNotif, bp }) {
               </div>
             </div>
             <div>
+              <label style={{ fontSize:12, fontWeight:600, color:"#475569", display:"block", marginBottom:4 }}>管理会社</label>
+              <input style={S.input} placeholder="例：○○メンテナンス株式会社" value={info.managementCompany} onChange={e => { setInfo({...info,managementCompany:e.target.value}); setInfoEdited(true); }} />
+            </div>
+            <div>
               <label style={{ fontSize:12, fontWeight:600, color:"#475569", display:"block", marginBottom:4 }}>仕様</label>
               <textarea style={{ ...S.input, minHeight:60, resize:"vertical" }} placeholder="型番・規格・メーカーなど" value={info.spec} onChange={e => { setInfo({...info,spec:e.target.value}); setInfoEdited(true); }} />
             </div>
@@ -1516,7 +1709,7 @@ function EquipDetailEditor({ equipment, onUpdate, onDelete, showNotif, bp }) {
             {infoEdited && (
               <div style={{ display:"flex", gap:8 }}>
                 <button style={{ ...S.saveBtn, flex:1 }} onClick={saveInfo}>保存する</button>
-                <button style={S.cancelBtnSm} onClick={() => { setInfo({ name:equipment.name, assetNo:equipment.assetNo||"", category:equipment.category, location:equipment.location, managerMain:equipment.managerMain||"", managerSub:equipment.managerSub||"", spec:equipment.spec||"", note:equipment.note||"" }); setInfoEdited(false); }}>戻る</button>
+                <button style={S.cancelBtnSm} onClick={() => { setInfo({ name:equipment.name, assetNo:equipment.assetNo||"", category:equipment.category, location:equipment.location, managerMain:equipment.managerMain||"", managerSub:equipment.managerSub||"", managementCompany:equipment.managementCompany||"", spec:equipment.spec||"", note:equipment.note||"" }); setInfoEdited(false); }}>戻る</button>
               </div>
             )}
           </div>
