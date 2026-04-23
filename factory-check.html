@@ -108,41 +108,299 @@ function generateId() { return Date.now().toString(36)+Math.random().toString(36
 // 初期データ
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const INIT_EQUIPMENT = [
-  { id:"eq1", name:"プレス機 #1", assetNo:"", category:"設備", location:"A棟-1F", managerMain:"", managerSub:"", managementCompany:"", spec:"", note:"", image:null, checkItems:[
-    {id:"ci1a",label:"外観に異常（傷・変形・腐食）はないか",frequency:"daily",   lastDate:null},
-    {id:"ci1b",label:"稼働音に異常はないか",                frequency:"daily",   lastDate:null},
-    {id:"ci1c",label:"振動・発熱に異常はないか",            frequency:"weekly",  lastDate:null},
-    {id:"ci1d",label:"安全カバー・ガードは正常か",          frequency:"monthly", lastDate:null},
-    {id:"ci1e",label:"緊急停止ボタンは動作するか",          frequency:"monthly", lastDate:null},
+  { id:"moasirtic7sou", name:"コンベックス　Ci01-D-001", assetNo:"Ci01-D-001", category:"一般計測器", location:"第3工場　笠木ライン", managerMain:"ホアン・タイン・フー", managerSub:"", managementCompany:"ダイワワークス（有）", spec:"5.5", note:"2026/1/23　交換", image:null, checkItems:[
+    {id:"moasirtiu233h",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtin9y5e",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti1joof",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtidcov8",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiygm6y",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtinxvou",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
   ]},
-  { id:"eq2", name:"旋盤 #3", assetNo:"", category:"設備", location:"A棟-2F", managerMain:"", managerSub:"", managementCompany:"", spec:"", note:"", image:null, checkItems:[
-    {id:"ci2a",label:"外観に異常はないか",                  frequency:"daily",   lastDate:null},
-    {id:"ci2b",label:"オイル・冷却水の漏れはないか",        frequency:"weekly",  lastDate:null},
-    {id:"ci2c",label:"各部ボルト・ナットの緩みはないか",    frequency:"monthly", lastDate:null},
-    {id:"ci2d",label:"刃物・工具の取付は正常か",            frequency:"daily",   lastDate:null},
+  { id:"moasirtilzn5m", name:"コンベックス　Ci01-D-002", assetNo:"Ci01-D-002", category:"一般計測器", location:"第3工場　サイクルライン", managerMain:"栗田　倫明", managerSub:"", managementCompany:"ダイワワークス（有）", spec:"5.5", note:"2024/12/23　新規登録", image:null, checkItems:[
+    {id:"moasirtiiw6tq",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtia3q4l",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiwy4w6",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiu9feh",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtippkoi",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtitrtni",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
   ]},
-  { id:"eq3", name:"溶接機 #2", assetNo:"", category:"設備", location:"B棟-1F", managerMain:"", managerSub:"", managementCompany:"", spec:"", note:"", image:null, checkItems:[
-    {id:"ci3a",label:"電源ケーブルに損傷はないか",          frequency:"weekly",  lastDate:null},
-    {id:"ci3b",label:"ガスホースの接続は正常か",            frequency:"daily",   lastDate:null},
-    {id:"ci3c",label:"アース接続は確実か",                  frequency:"weekly",  lastDate:null},
-    {id:"ci3d",label:"溶接面・保護具は揃っているか",        frequency:"monthly", lastDate:null},
+  { id:"moasirtiu04vu", name:"コンベックス　Ci01-D-003", assetNo:"Ci01-D-003", category:"一般計測器", location:"第3工場　笠木ライン", managerMain:"チャン・デイン・クイ", managerSub:"", managementCompany:"ダイワワークス（有）", spec:"5.5", note:"2026/1/23　交換", image:null, checkItems:[
+    {id:"moasirti1hbxr",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti8vbqk",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtitybv7",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtipsfzc",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtintcqy",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirti9ejxr",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
   ]},
-  { id:"eq4", name:"治具 A-07", assetNo:"", category:"治具", location:"A棟-1F", managerMain:"", managerSub:"", managementCompany:"", spec:"", note:"", image:null, checkItems:[
-    {id:"ci4a",label:"外観に損傷（欠け・割れ・変形）はないか",frequency:"weekly",   lastDate:null},
-    {id:"ci4b",label:"寸法精度は規格内か",                    frequency:"monthly",  lastDate:null},
-    {id:"ci4c",label:"取付穴・ピンに摩耗はないか",            frequency:"quarterly",lastDate:null},
-    {id:"ci4d",label:"刻印・識別番号は確認できるか",          frequency:"monthly",  lastDate:null},
+  { id:"moasirtig8wip", name:"コンベックス　Ci01-D-004", assetNo:"Ci01-D-004", category:"一般計測器", location:"第3工場　部品置場", managerMain:"小津　佳史", managerSub:"", managementCompany:"ダイワワークス（有）", spec:"5.5", note:"2024/7/12交換", image:null, checkItems:[
+    {id:"moasirtirqt7w",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtifhi46",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti0f5vx",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtij1nd1",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtih7km9",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtig50qe",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
   ]},
-  { id:"eq5", name:"治具 B-12", assetNo:"", category:"治具", location:"B棟-2F", managerMain:"", managerSub:"", managementCompany:"", spec:"", note:"", image:null, checkItems:[
-    {id:"ci5a",label:"外観に損傷はないか",                  frequency:"weekly",  lastDate:null},
-    {id:"ci5b",label:"清掃・油分除去は完了しているか",      frequency:"daily",   lastDate:null},
-    {id:"ci5c",label:"刻印・識別番号は確認できるか",        frequency:"monthly", lastDate:null},
+  { id:"moasirti2j4y7", name:"コンベックス　Ci01-D-005", assetNo:"Ci01-D-005", category:"一般計測器", location:"第3工場　笠木ライン", managerMain:"市川　洋介", managerSub:"", managementCompany:"ダイワワークス（有）", spec:"5.5", note:"2024/10/22　Ck01-D-004より変更", image:null, checkItems:[
+    {id:"moasirti4g4o5",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtirb4r1",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti415dn",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiyv09c",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtidstq4",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiykwje",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
   ]},
-  { id:"eq6", name:"コンベア #1", assetNo:"", category:"設備", location:"C棟-1F", managerMain:"", managerSub:"", managementCompany:"", spec:"", note:"", image:null, checkItems:[
-    {id:"ci6a",label:"ベルトに亀裂・摩耗はないか",          frequency:"weekly",  lastDate:null},
-    {id:"ci6b",label:"ローラーの回転は正常か",              frequency:"weekly",  lastDate:null},
-    {id:"ci6c",label:"駆動部の異音・振動はないか",          frequency:"daily",   lastDate:null},
-    {id:"ci6d",label:"非常停止装置は動作するか",            frequency:"monthly", lastDate:null},
+  { id:"moasirtiaesxq", name:"コンベックス　Ci01-D-006", assetNo:"Ci01-D-006", category:"一般計測器", location:"第3工場　サイクルライン", managerMain:"グェン・ヴァン・ホアン", managerSub:"", managementCompany:"ダイワワークス（有）", spec:"5.5", note:"2023/10/23　取扱者変更", image:null, checkItems:[
+    {id:"moasirtiixqpr",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti9rw06",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtizfyac",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtisvmp8",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtidlk7b",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiazky3",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirtim7vrj", name:"コンベックス　Ci01-D-007", assetNo:"Ci01-D-007", category:"一般計測器", location:"第3工場　タレパンライン", managerMain:"チン・ドゥック・ドー", managerSub:"", managementCompany:"ダイワワークス（有）", spec:"5.5", note:"2024/11/28　新規登録", image:null, checkItems:[
+    {id:"moasirtitln1k",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti4buvl",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti7c9bq",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti8ap48",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtijpt7g",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtihdsq4",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirtipxtt9", name:"コンベックス　Ci01-D-008", assetNo:"Ci01-D-008", category:"一般計測器", location:"第3工場　笠木ライン", managerMain:"川口　千宝", managerSub:"", managementCompany:"ダイワワークス（有）", spec:"5.5", note:"2026/1/23　交換", image:null, checkItems:[
+    {id:"moasirti45qwb",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtii8iza",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiythdp",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtid5tqe",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti0vjvt",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtijngsc",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirticchcd", name:"コンベックス　Ci01-D-009", assetNo:"Ci01-D-009", category:"一般計測器", location:"第3工場　部品置場", managerMain:"久木元叶", managerSub:"", managementCompany:"ダイワワークス（有）", spec:"5.5", note:"2023/6/8　　新規登録", image:null, checkItems:[
+    {id:"moasirtiwqpoj",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiudgq7",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtir5q9q",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtitbtfu",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtisx2bw",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtihl2q6",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirtih72wr", name:"コンベックス　Ci01-C-002", assetNo:"Ci01-C-002", category:"一般計測器", location:"東工場　垂壁・隔壁ライン", managerMain:"チュ・ヴァン・ヒエン", managerSub:"", managementCompany:"（有）荒川工業", spec:"5.5", note:"2026/1/23交換", image:null, checkItems:[
+    {id:"moasirti7kx52",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtihf63p",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti33vzs",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti6v98w",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtijj27d",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtinoqru",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirti8bq2u", name:"コンベックス　Ci01-C-003", assetNo:"Ci01-C-003", category:"一般計測器", location:"東工場　垂壁・隔壁ライン", managerMain:"サジイン", managerSub:"", managementCompany:"（有）荒川工業", spec:"5.5", note:"2025/7/24交換", image:null, checkItems:[
+    {id:"moasirti7dvfw",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti1fpz7",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtii06wc",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti9kv0x",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtindtev",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtisob3u",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirtiwnvx2", name:"コンベックス　Ci01-C-004", assetNo:"Ci01-C-004", category:"一般計測器", location:"東工場　木製折戸ライン", managerMain:"ダン・マノ・フン", managerSub:"", managementCompany:"（有）荒川工業", spec:"5.5", note:"2024/2/27新規登録", image:null, checkItems:[
+    {id:"moasirtiwjstm",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtinqqu9",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtid4ox2",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtil9zh8",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtia1ush",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtihkmk2",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirti4iw1b", name:"コンベックス　Ci01-C-005", assetNo:"Ci01-C-005", category:"一般計測器", location:"東工場　折戸レール", managerMain:"伊藤　舞", managerSub:"", managementCompany:"（有）荒川工業", spec:"5.5", note:"2026/4/7交換", image:null, checkItems:[
+    {id:"moasirtihr4mt",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtic7h06",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti7ztyt",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtilwy7l",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti4rovi",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiw9e9p",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirtiix8vf", name:"コンベックス　Ci01-C-007", assetNo:"Ci01-C-007", category:"一般計測器", location:"東工場　垂壁・隔壁ライン", managerMain:"キエウ・ニャット・フォン", managerSub:"", managementCompany:"（有）荒川工業", spec:"5.5", note:"2025/10/21交換", image:null, checkItems:[
+    {id:"moasirti7s0jl",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtityaka",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiwtkps",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti9ynsa",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtib4twc",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiz4kna",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirti0g8cw", name:"コンベックス　Ci01-C-008", assetNo:"Ci01-C-008", category:"一般計測器", location:"東工場　床下収納ライン", managerMain:"川戸　唯", managerSub:"", managementCompany:"（有）荒川工業", spec:"5.5", note:"2026/4/21交換", image:null, checkItems:[
+    {id:"moasirtivsgeb",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtis2f9c",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti0q3mx",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti06q3a",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtid87s8",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirti3qq56",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirti5a2sq", name:"コンベックス　Ci01-C-009", assetNo:"Ci01-C-009", category:"一般計測器", location:"東工場　換気ライン", managerMain:"荒川　勝史", managerSub:"", managementCompany:"（有）荒川工業", spec:"5.5", note:"2023/4/21取扱責任者変更", image:null, checkItems:[
+    {id:"moasirtiz1yza",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtit2fis",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtipwe0o",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtit3zha",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtirz4oa",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtil681c",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirtiqtna3", name:"コンベックス　Ci01-C-011", assetNo:"Ci01-C-011", category:"一般計測器", location:"東工場　折戸レール", managerMain:"荒川　豊子", managerSub:"", managementCompany:"（有）荒川工業", spec:"5.5", note:"", image:null, checkItems:[
+    {id:"moasirtij412q",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti3pq5f",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiqw338",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiolyb0",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtidmo4g",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirti9qkay",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirtif5bce", name:"コンベックス　Ci01-C-012", assetNo:"Ci01-C-012", category:"一般計測器", location:"東工場　垂壁・隔壁ライン", managerMain:"ディヌシャ", managerSub:"", managementCompany:"（有）荒川工業", spec:"5.5", note:"2025/1/21新規登録", image:null, checkItems:[
+    {id:"moasirtih5jwu",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtia3y75",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtitoof9",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti6yym5",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti9c11v",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiba0zj",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirtiouoan", name:"コンベックス　Ci01-C-013", assetNo:"Ci01-C-013", category:"一般計測器", location:"東工場　床下収納ライン", managerMain:"石田　敏彦", managerSub:"", managementCompany:"（有）荒川工業", spec:"5.5", note:"2023/4/21ライン変更", image:null, checkItems:[
+    {id:"moasirtioafei",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiflx9o",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti25cst",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti4ckv6",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtii1xfj",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirti4egzh",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirtinzov9", name:"コンベックス　Ci01-C-014", assetNo:"Ci01-C-014", category:"一般計測器", location:"東工場　垂壁・隔壁ライン", managerMain:"ﾃﾞｨﾝ・ｳﾞｧﾝ・ﾄアｲ", managerSub:"", managementCompany:"（有）荒川工業", spec:"5.5", note:"2025/11/12　交換", image:null, checkItems:[
+    {id:"moasirtiggbb2",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtibitj2",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtizckg4",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti2qvuo",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtidhpwk",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtip5m6h",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirtiv8gs6", name:"コンベックス　Ci01-C-015", assetNo:"Ci01-C-015", category:"一般計測器", location:"東工場　垂壁・隔壁ライン", managerMain:"上田　ダビド", managerSub:"", managementCompany:"（有）荒川工業", spec:"5.5", note:"2026/1/27交換", image:null, checkItems:[
+    {id:"moasirtidr6e6",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti4zolo",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti7ck4z",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiat2rd",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtin3goh",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiu37wv",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirtimxiby", name:"コンベックス　Ci01-C-016", assetNo:"Ci01-C-016", category:"一般計測器", location:"東工場　垂壁・隔壁ライン", managerMain:"グエン・バン・ザン", managerSub:"", managementCompany:"（有）荒川工業", spec:"5.5", note:"2026/3/12交換", image:null, checkItems:[
+    {id:"moasirtisjc13",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtighu4u",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti9seee",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtibaet5",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti0frl9",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirti5z35i",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirtib0z5h", name:"コンベックス　Ci01-E-001", assetNo:"Ci01-E-001", category:"一般計測器", location:"第2工場　塗装ライン", managerMain:"大平　雄貴", managerSub:"", managementCompany:"日伸工業（株）", spec:"5.5", note:"", image:null, checkItems:[
+    {id:"moasirti475ry",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtikmray",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti75jai",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiiwdo2",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiuiyz3",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtir7opb",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirtilg03p", name:"コンベックス　Ci01-F-001", assetNo:"Ci01-F-001", category:"一般計測器", location:"東工場　軒天見切ライン", managerMain:"諸岡　幸子", managerSub:"", managementCompany:"（株）五十六", spec:"5.5", note:"2023/12/6　新規登録", image:null, checkItems:[
+    {id:"moasirti7fmoo",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtieqemu",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti28fk6",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtif7any",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiuu305",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtizdlpe",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirti0cjvr", name:"コンベックス　Ci01-F-002", assetNo:"Ci01-F-002", category:"一般計測器", location:"東工場　軒天見切ライン", managerMain:"ナナン・プラセティヨ", managerSub:"", managementCompany:"（株）五十六", spec:"5.5", note:"2020/10/21取扱者変更", image:null, checkItems:[
+    {id:"moasirtipkzav",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti7vhvh",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiebnjy",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiq7lt7",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti3p7p9",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirti3zm05",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirti7pfej", name:"コンベックス　Ci01-F-003", assetNo:"Ci01-F-003", category:"一般計測器", location:"東工場　軒天見切ライン", managerMain:"チャン・ティ・フォン", managerSub:"", managementCompany:"（株）五十六", spec:"5.5", note:"2024/7/2　取扱者変更", image:null, checkItems:[
+    {id:"moasirtiy3cux",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiesenr",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtibs3pw",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtigbpxd",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti8unq5",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirti6vsw4",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirtic1nkm", name:"コンベックス　Ci01-F-004", assetNo:"Ci01-F-004", category:"一般計測器", location:"東工場　軒天見切ライン", managerMain:"荻須　浩史", managerSub:"", managementCompany:"（株）五十六", spec:"5.5", note:"2025/7/24交換", image:null, checkItems:[
+    {id:"moasirtiyhfg4",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti746td",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtigetcv",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtivakgt",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti6eq7m",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirti8l0kh",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirtiqn9nn", name:"コンベックス　Ci01-F-006", assetNo:"Ci01-F-006", category:"一般計測器", location:"第3工場　五十六製造1課", managerMain:"川瀬　正史", managerSub:"", managementCompany:"（株）五十六", spec:"5.5", note:"", image:null, checkItems:[
+    {id:"moasirtiugqpp",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiyky39",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtifovmm",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiw8lcy",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtif54h0",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtimjcgy",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirtibsrjp", name:"コンベックス　Ci01-F-007", assetNo:"Ci01-F-007", category:"一般計測器", location:"第3工場　五十六製造1課", managerMain:"グエン・デュック・マイン", managerSub:"", managementCompany:"（株）五十六", spec:"5.5", note:"2026/4/21交換", image:null, checkItems:[
+    {id:"moasirti3ckpr",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti701hc",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiowik6",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtilzrfk",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtium8rj",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtivy5cf",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirtiw5acm", name:"コンベックス　Ci01-F-008", assetNo:"Ci01-F-008", category:"一般計測器", location:"第3工場　五十六製造1課", managerMain:"ファム・ティ・フォン", managerSub:"", managementCompany:"（株）五十六", spec:"5.5", note:"2025/6/4交換", image:null, checkItems:[
+    {id:"moasirtiofmte",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtihszlo",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtipa65n",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtim6e3y",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiokwam",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiaqub3",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirtid1pwy", name:"コンベックス　Ci01-F-009", assetNo:"Ci01-F-009", category:"一般計測器", location:"第3工場　五十六製造1課", managerMain:"ブイ・ビエット・アン", managerSub:"", managementCompany:"（株）五十六", spec:"5.5", note:"2025/7/24新規登録", image:null, checkItems:[
+    {id:"moasirti1nfeg",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtivfg1a",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiekxm8",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiy86c8",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti0am0n",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirti89u8x",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirti4dfpr", name:"コンベックス　Ci01-F-010", assetNo:"Ci01-F-010", category:"一般計測器", location:"第3工場　五十六製造1課", managerMain:"ニコラス・ワン", managerSub:"", managementCompany:"（株）五十六", spec:"5.5", note:"2025/10/21交換", image:null, checkItems:[
+    {id:"moasirtixh303",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtih74ou",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtijxmve",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtihgsj7",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiivzlt",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirti3ha7o",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirtiwpkss", name:"コンベックス　Ci01-F-011", assetNo:"Ci01-F-011", category:"一般計測器", location:"第3工場　五十六製造1課", managerMain:"ノン・ティ・ジェン", managerSub:"", managementCompany:"（株）五十六", spec:"5.5", note:"2025/12/15新規登録", image:null, checkItems:[
+    {id:"moasirtig9nwr",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtimx8u2",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtistbr4",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirticwgsh",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtismr5b",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiu184e",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirti2ht8a", name:"コンベックス　Ci01-F-012", assetNo:"Ci01-F-012", category:"一般計測器", location:"第3工場　五十六製造1課", managerMain:"グエン・トゥアン・アイン", managerSub:"", managementCompany:"（株）五十六", spec:"5.5", note:"2026/4/21交換", image:null, checkItems:[
+    {id:"moasirtirolbu",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiex6re",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti55bs7",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti3xvmy",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtib77l6",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtif7rxr",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirtiwoiey", name:"コンベックス　Ci01-F-013", assetNo:"Ci01-F-013", category:"一般計測器", location:"第3工場　五十六製造1課", managerMain:"リュー・バン・ドゥック", managerSub:"", managementCompany:"（株）五十六", spec:"5.5", note:"2024/4/22交換", image:null, checkItems:[
+    {id:"moasirtin2zig",label:"外観にてヒビ、ワレのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtikg1vo",label:"外観にて遊びが大きすぎないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiqjwph",label:"フックに変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti00u55",label:"巻き尺に変形、錆がないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti1kzcq",label:"目盛り線、数字がはっきり確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirti2qez2",label:"巻き尺の出入りがスムーズであること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirti6xesd", name:"プロトラクター　Ci05-C-001", assetNo:"Ci05-C-001", category:"一般計測器", location:"第2工場　スチール階段", managerMain:"栗田　貴正", managerSub:"", managementCompany:"（有）荒川工業", spec:"", note:"2025/2/27交換", image:null, checkItems:[
+    {id:"moasirti12d1v",label:"外観にて変形のないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiht4dt",label:"測定面に変形、カケのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti01xw4",label:"目盛り線、数字がハッキリ確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtil1dan",label:"回転機能にてひっかかりがなく回転すること",frequency:"quarterly",lastDate:null},
+    {id:"moasirti53aa6",label:"ストッパー機能にて完全に固定できること",frequency:"quarterly",lastDate:null}
+  ]},
+  { id:"moasirti5az3o", name:"プロトラクター　Ci05-C-002", assetNo:"Ci05-C-002", category:"一般計測器", location:"第2工場　スチール階段", managerMain:"中川　雄介", managerSub:"", managementCompany:"（有）荒川工業", spec:"", note:"2025/10/14交換", image:null, checkItems:[
+    {id:"moasirti5rosv",label:"外観にて変形のないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirti81a6i",label:"測定面に変形、カケのないこと",frequency:"quarterly",lastDate:null},
+    {id:"moasirtiaiqk2",label:"目盛り線、数字がハッキリ確認できること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtid75wc",label:"回転機能にてひっかかりがなく回転すること",frequency:"quarterly",lastDate:null},
+    {id:"moasirtipfno6",label:"ストッパー機能にて完全に固定できること",frequency:"quarterly",lastDate:null}
   ]},
 ];
 
