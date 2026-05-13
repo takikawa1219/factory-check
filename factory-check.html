@@ -687,6 +687,7 @@ function EquipCard({ eq, records, today, onStart, bp }) {
           </div>
           <div style={{ fontSize:11, color:"#94a3b8", marginBottom:6 }}>📍 {eq.location} · {(eq.checkItems||[]).length}項目</div>
           {eq.assetNo && <div style={{ fontSize:11, color:"#64748b", marginBottom:4 }}>🔖 管理番号：{eq.assetNo}</div>}
+          {eq.managerMain && <div style={{ fontSize:11, color:"#64748b", marginBottom:4 }}>👤 取扱責任者：{eq.managerMain}</div>}
           {eq.managementCompany && <div style={{ fontSize:11, color:"#64748b", marginBottom:4 }}>🏢 管理会社：{eq.managementCompany}</div>}
           {overdueItems.length > 0 && (
             <div style={{ fontSize:11, fontWeight:600, color:"#dc2626", background:"#fee2e2", padding:"3px 8px", borderRadius:6, marginBottom:4 }}>
@@ -829,8 +830,9 @@ function EquipmentPicker({ equipment, onSelect, bp }) {
               </div>
               <div style={{ padding:"12px 14px", flex:1 }}>
                 <div style={{ fontSize:15, fontWeight:700, color:"#0f172a", marginBottom:3 }}>{eq.name}</div>
-                <div style={{ fontSize:11, color:"#94a3b8", marginBottom:8 }}>📍 {eq.location} · {(eq.checkItems||[]).length}項目</div>
-                {eq.assetNo && <div style={{ fontSize:11, color:"#64748b", marginBottom:8 }}>🔖 管理番号：{eq.assetNo}</div>}
+                <div style={{ fontSize:11, color:"#94a3b8", marginBottom:4 }}>📍 {eq.location} · {(eq.checkItems||[]).length}項目</div>
+                {eq.assetNo && <div style={{ fontSize:11, color:"#64748b", marginBottom:4 }}>🔖 管理番号：{eq.assetNo}</div>}
+                {eq.managerMain && <div style={{ fontSize:11, color:"#64748b", marginBottom:8 }}>👤 取扱責任者：{eq.managerMain}</div>}
                 <div style={{ background:"#3b82f6", color:"white", borderRadius:7, padding:"8px 12px",
                   fontSize:13, fontWeight:700, display:"inline-block" }}>選択して点検開始 →</div>
               </div>
@@ -1096,39 +1098,79 @@ function HistoryView({ records, bp }) {
   function exportExcel(targetRecords, label) {
     if (targetRecords.length === 0) { alert("エクスポートする記録がありません"); return; }
 
-    // 1行1点検記録（異常項目は結合して1セルに）
-    const rows = targetRecords.map(rec => {
-      const abnormalItems = rec.items.filter(i => i.status==="異常" || i.status==="要注意");
-      const abnormalText  = abnormalItems.length > 0
-        ? abnormalItems.map(i => `${i.label}（${i.status}）${i.note ? "："+i.note : ""}`).join(" / ")
-        : "—";
-      return {
-        "記録ID":     rec.id,
-        "点検日":     rec.date,
-        "点検時刻":   rec.time,
-        "設備名":     rec.equipment.name,
-        "管理番号":   rec.equipment.assetNo || "—",
-        "カテゴリ":   rec.equipment.category,
-        "場所":       rec.equipment.location,
-        "担当者":     rec.inspector,
-        "総合結果":   rec.overall,
-        "点検項目数": rec.items.length,
-        "異常・要注意項目": abnormalText,
-        "コメント":   rec.overallNote || "—",
-        "取扱責任者（正）": rec.equipment.managerMain || "—",
-        "取扱責任者（副）": rec.equipment.managerSub || "—",
-        "仕様":       rec.equipment.spec || "—",
-        "備考":       rec.equipment.note || "—",
-      };
+    const STATUS_SYMBOL = { "正常":"✓", "要注意":"△", "異常":"×", "未点検":"—" };
+
+    // 1行1点検項目形式で出力
+    const rows = [];
+    targetRecords.forEach(rec => {
+      if (rec.items.length === 0) {
+        // 点検項目がない場合は設備情報のみ1行
+        rows.push({
+          "記録ID":           rec.id,
+          "点検日":           rec.date,
+          "点検時刻":         rec.time,
+          "設備名":           rec.equipment.name,
+          "管理番号":         rec.equipment.assetNo || "—",
+          "カテゴリ":         rec.equipment.category,
+          "設置場所":         rec.equipment.location,
+          "取扱責任者（正）": rec.equipment.managerMain || "—",
+          "取扱責任者（副）": rec.equipment.managerSub || "—",
+          "管理会社":         rec.equipment.managementCompany || "—",
+          "担当者":           rec.inspector,
+          "総合結果":         rec.overall,
+          "点検項目":         "—",
+          "結果記号":         "—",
+          "結果":             "—",
+          "コメント（項目）": "—",
+          "コメント（全体）": rec.overallNote || "—",
+        });
+      } else {
+        rec.items.forEach((item, idx) => {
+          const symbol = STATUS_SYMBOL[item.status] || "—";
+          rows.push({
+            "記録ID":           idx === 0 ? rec.id : "",
+            "点検日":           idx === 0 ? rec.date : "",
+            "点検時刻":         idx === 0 ? rec.time : "",
+            "設備名":           idx === 0 ? rec.equipment.name : "",
+            "管理番号":         idx === 0 ? (rec.equipment.assetNo || "—") : "",
+            "カテゴリ":         idx === 0 ? rec.equipment.category : "",
+            "設置場所":         idx === 0 ? rec.equipment.location : "",
+            "取扱責任者（正）": idx === 0 ? (rec.equipment.managerMain || "—") : "",
+            "取扱責任者（副）": idx === 0 ? (rec.equipment.managerSub || "—") : "",
+            "管理会社":         idx === 0 ? (rec.equipment.managementCompany || "—") : "",
+            "担当者":           idx === 0 ? rec.inspector : "",
+            "総合結果":         idx === 0 ? rec.overall : "",
+            "点検項目":         item.label,
+            "結果記号":         symbol,
+            "結果":             item.status,
+            "コメント（項目）": item.note || "—",
+            "コメント（全体）": idx === 0 ? (rec.overallNote || "—") : "",
+          });
+        });
+      }
     });
 
     const ws = XLSX.utils.json_to_sheet(rows);
 
     // 列幅の設定
     ws["!cols"] = [
-      { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 16 }, { wch: 12 },
-      { wch: 8  }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 10 },
-      { wch: 40 }, { wch: 30 }, { wch: 16 }, { wch: 16 }, { wch: 30 }, { wch: 30 },
+      { wch:14 }, // 記録ID
+      { wch:12 }, // 点検日
+      { wch:10 }, // 点検時刻
+      { wch:18 }, // 設備名
+      { wch:12 }, // 管理番号
+      { wch:10 }, // カテゴリ
+      { wch:14 }, // 設置場所
+      { wch:16 }, // 取扱責任者（正）
+      { wch:16 }, // 取扱責任者（副）
+      { wch:22 }, // 管理会社
+      { wch:12 }, // 担当者
+      { wch:10 }, // 総合結果
+      { wch:30 }, // 点検項目
+      { wch: 8 }, // 結果記号
+      { wch:10 }, // 結果
+      { wch:24 }, // コメント（項目）
+      { wch:24 }, // コメント（全体）
     ];
 
     const wb = XLSX.utils.book_new();
@@ -1335,34 +1377,36 @@ function AdminView({ records, equipment, onEquipmentChange, showNotif, bp }) {
         if (missing.length > 0) { showNotif(`必須列がありません：${missing.join("、")}`, "error"); return; }
 
         const errors = [];
-        // 設備名をキーにグループ化
-        const equipMap = new Map(); // name → equipData
+        // 管理番号をキーにグループ化（管理番号が空の場合は設備名をキーに）
+        const equipMap = new Map(); // key → equipData
         const equipOrder = []; // 順序保持
 
         raw.slice(1).forEach((row, i) => {
           const lineNo = i + 2;
-          // 空行スキップ（設備名・点検項目ともに空）
-          const rawName = String(row[colMap["name"]] ?? "").trim();
-          const rawLabel = colMap["checkLabel"] !== undefined ? String(row[colMap["checkLabel"]] ?? "").trim() : "";
-          if (!rawName && !rawLabel) return;
+          // 空行スキップ（管理番号・設備名・点検項目がすべて空）
+          const rawName   = String(row[colMap["name"]]    ?? "").trim();
+          const rawAssetNo = colMap["assetNo"] !== undefined ? String(row[colMap["assetNo"]] ?? "").trim() : "";
+          const rawLabel  = colMap["checkLabel"] !== undefined ? String(row[colMap["checkLabel"]] ?? "").trim() : "";
+          if (!rawName && !rawAssetNo && !rawLabel) return;
 
-          // 設備名が空の行は直前の設備への点検項目行とみなす
-          const currentName = rawName || (equipOrder.length > 0 ? equipOrder[equipOrder.length-1] : "");
-          if (!currentName) return;
+          // グループキー：管理番号優先、なければ設備名、どちらもなければ直前のキー
+          const newKey = rawAssetNo || rawName;
+          const currentKey = newKey || (equipOrder.length > 0 ? equipOrder[equipOrder.length-1] : "");
+          if (!currentKey) return;
 
-          if (!equipMap.has(currentName)) {
+          if (!equipMap.has(currentKey)) {
             // 新規設備
             const category = colMap["category"] !== undefined ? String(row[colMap["category"]] ?? "").trim() : "設備";
             const validCat = VALID_CATEGORIES.includes(category) ? category : "設備";
             if (category && !VALID_CATEGORIES.includes(category)) {
               errors.push(`行${lineNo}：カテゴリ「${category}」は無効のため「設備」に設定します`);
             }
-            const equipData = { name: currentName, category: validCat, checkItems: [] };
+            const equipData = { name: rawName || currentKey, category: validCat, checkItems: [] };
             MASTER_COLS.filter(c => !["name","category","checkLabel","checkFreq"].includes(c.key)).forEach(col => {
               equipData[col.key] = colMap[col.key] !== undefined ? String(row[colMap[col.key]] ?? "").trim() : "";
             });
-            equipMap.set(currentName, equipData);
-            equipOrder.push(currentName);
+            equipMap.set(currentKey, equipData);
+            equipOrder.push(currentKey);
           }
 
           // 点検項目の追加
@@ -1372,11 +1416,11 @@ function AdminView({ records, equipment, onEquipmentChange, showNotif, bp }) {
             if (rawFreq && !FREQ_LABEL_TO_VALUE[rawFreq]) {
               errors.push(`行${lineNo}：頻度「${rawFreq}」は無効のため「設定なし」に設定します`);
             }
-            equipMap.get(currentName).checkItems.push({ label: rawLabel, frequency: freqValue });
+            equipMap.get(currentKey).checkItems.push({ label: rawLabel, frequency: freqValue });
           }
         });
 
-        const equipList = equipOrder.map(name => equipMap.get(name));
+        const equipList = equipOrder.map(key => equipMap.get(key));
         if (equipList.length === 0) { showNotif("有効なデータ行がありません","error"); return; }
         setXlsxPreview({ equipList, errors });
       } catch(err) {
@@ -1406,7 +1450,10 @@ function AdminView({ records, equipment, onEquipmentChange, showNotif, bp }) {
       onEquipmentChange(prev => {
         const updated = [...prev];
         newEquips.forEach(ne => {
-          const existIdx = updated.findIndex(e => e.name === ne.name);
+          // 管理番号で一致検索、なければ設備名で検索
+          const existIdx = ne.assetNo
+            ? updated.findIndex(e => e.assetNo && e.assetNo === ne.assetNo)
+            : updated.findIndex(e => e.name === ne.name);
           if (existIdx >= 0) {
             // 既存更新：画像は保持、点検項目はExcelの内容で上書き（空なら保持）
             const mergedItems = ne.checkItems.length > 0 ? ne.checkItems : updated[existIdx].checkItems;
