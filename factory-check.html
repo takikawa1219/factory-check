@@ -443,6 +443,7 @@ function App() {
     setActiveInspection({ id:generateId(), equipment:eq, date:todayStr(), time:nowStr(),
       inspector:role==="admin"?"管理者":"作業員A", items, photos:[], overallNote:"", submitted:false });
     setView("inspect");
+    window.scrollTo({ top:0, behavior:"smooth" });
   }
 
   // ── Power Automate連携設定 ──
@@ -456,29 +457,30 @@ function App() {
     const overall = hasAb ? "異常" : hasWa ? "要注意" : "正常";
     const finished = { ...activeInspection, submitted:true, overall };
 
-    // ── Excelへの送信 ──
-    showNotif("Excelに記録を送信中...", "info");
-    try {
-      const payload = {
-        id:            finished.id,
-        date:          finished.date,
-        time:          finished.time,
-        equipmentName: finished.equipment.name,
-        location:      finished.equipment.location,
-        inspector:     finished.inspector,
-        overall:       overall,
-        overallNote:   finished.overallNote || "",
-      };
-      const res = await fetch(POWER_AUTOMATE_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error("送信失敗");
-      showNotif("Excelに記録しました ✓");
-    } catch(e) {
-      // 送信失敗してもアプリ内には保存する
-      showNotif("Excel送信に失敗しました（アプリ内には保存済み）", "error");
+    // ── Power Automate連携（URLが設定されている場合のみ送信）──
+    const isPAConfigured = POWER_AUTOMATE_URL && !POWER_AUTOMATE_URL.startsWith("★");
+    if (isPAConfigured) {
+      try {
+        const payload = {
+          id:            finished.id,
+          date:          finished.date,
+          time:          finished.time,
+          equipmentName: finished.equipment.name,
+          location:      finished.equipment.location,
+          inspector:     finished.inspector,
+          overall:       overall,
+          overallNote:   finished.overallNote || "",
+        };
+        const res = await fetch(POWER_AUTOMATE_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error("送信失敗");
+        showNotif("Excelに記録しました ✓");
+      } catch(e) {
+        showNotif("Excel送信に失敗しました（アプリ内には保存済み）", "error");
+      }
     }
 
     setRecords(r => [finished, ...r]);
@@ -489,7 +491,10 @@ function App() {
         return done ? { ...ci, lastDate:activeInspection.date } : ci;
       })};
     }));
-    setActiveInspection(null); setView("history");
+    setActiveInspection(null);
+    setView("dashboard");
+    window.scrollTo({ top:0, behavior:"smooth" });
+    showNotif("点検記録を保存しました ✓");
   }
 
   const navTabs = [
