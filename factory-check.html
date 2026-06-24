@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="FactoryCheck">
   <meta name="theme-color" content="#0f172a">
   <title>FactoryCheck - 設備・治具 点検管理</title>
@@ -513,7 +513,10 @@ function App() {
 
       {/* ── トップヘッダー ── */}
       <header style={{ background:"#0f172a", color:"white",
-        padding: bp.isMobile ? "10px 16px" : "12px 24px",
+        paddingTop: bp.isMobile ? "calc(env(safe-area-inset-top) + 10px)" : "12px",
+        paddingBottom: bp.isMobile ? "10px" : "12px",
+        paddingLeft: bp.isMobile ? "16px" : "24px",
+        paddingRight: bp.isMobile ? "16px" : "24px",
         display:"flex", alignItems:"center", justifyContent:"space-between",
         position:"sticky", top:0, zIndex:100, boxShadow:"0 2px 8px rgba(0,0,0,0.3)" }}>
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
@@ -569,7 +572,9 @@ function App() {
       {bp.isMobile && (
         <nav style={{ position:"fixed", bottom:0, left:0, right:0, background:"#0f172a",
           display:"flex", borderTop:"1px solid #334155", zIndex:100,
-          paddingBottom:"env(safe-area-inset-bottom)" }}>
+          paddingBottom:"env(safe-area-inset-bottom)",
+          paddingLeft:"env(safe-area-inset-left)",
+          paddingRight:"env(safe-area-inset-right)" }}>
           {navTabs.map(tab => (
             <button key={tab.id}
               style={{ flex:1, background:"transparent", border:"none",
